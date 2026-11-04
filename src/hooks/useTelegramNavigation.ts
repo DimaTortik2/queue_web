@@ -10,6 +10,11 @@ export function useTelegramNavigation() {
     const webApp = tg();
     if (!webApp?.BackButton) return;
 
+    // Check if BackButton is supported by Telegram WebApp version (>= 6.1)
+    if (typeof webApp.isVersionAtLeast === "function" && !webApp.isVersionAtLeast("6.1")) {
+      return;
+    }
+
     const isRoot = location.pathname === "/";
 
     if (isRoot) {

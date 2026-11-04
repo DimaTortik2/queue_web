@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  Pause,
-  Play,
   Trash,
   X,
-  FastForward,
-  Clock,
-  MagnifyingGlass,
   Copy,
+  ArrowsLeftRight,
+  UserPlus,
 } from "@phosphor-icons/react";
 import {
   Drawer,
@@ -26,18 +23,15 @@ import { RetryBanner } from "@/components/ui/retry-banner";
 import { haptic } from "@/lib/telegram";
 import { useUserStore } from "@/store/userStore";
 import {
+  useQueuesList,
   useQueueDetail,
   useMyPosition,
   useJoinQueueMutation,
   useLeaveQueueMutation,
-  useCuratorAdvanceMutation,
-  useCuratorPauseMutation,
-  useCuratorClearMutation,
   useCuratorDeleteQueueMutation,
   useCuratorKickMutation,
 } from "@/hooks/useQueueApi";
 import { useRoomSubscription } from "@/providers/WebSocketProvider";
-import { QueueHistoryDrawer } from "@/components/queue/QueueHistoryDrawer";
 import { DirectSwapDrawer } from "@/components/queue/DirectSwapDrawer";
 
 interface QueueSlotsModalProps {
@@ -60,13 +54,15 @@ export function QueueSlotsModal({
     name: string;
   } | null>(null);
 
-  const [confirmAction, setConfirmAction] = useState<"clear" | "delete" | null>(null);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isDeleteDrawerOpen, setIsDeleteDrawerOpen] = useState(false);
+  const [deleteInputText, setDeleteInputText] = useState("");
   const [isDirectSwapOpen, setIsDirectSwapOpen] = useState(false);
-  const [slotSearch, setSlotSearch] = useState("");
 
-  // Real-time WebSocket connection to this queue room while open
+  // Real-time WebSocket connection
   useRoomSubscription(isOpen && subject ? subject : null);
+
+  const { data: queuesData } = useQueuesList();
+  const currentMeta = queuesData?.queues?.find((q) => q.subject === subject);
 
   const {
     data: queueData,
@@ -78,14 +74,15 @@ export function QueueSlotsModal({
 
   const joinMutation = useJoinQueueMutation();
   const leaveMutation = useLeaveQueueMutation();
-  const advanceMutation = useCuratorAdvanceMutation();
-  const pauseMutation = useCuratorPauseMutation();
-  const clearMutation = useCuratorClearMutation();
   const deleteMutation = useCuratorDeleteQueueMutation();
   const kickMutation = useCuratorKickMutation();
 
-  const isCurator = user?.role === "curator";
+  const isCreator = user?.tg_id ? currentMeta?.created_by_tg_id === user.tg_id : false;
   const myPosition = myPosData?.position || null;
+  const totalPositions = queueData?.total_positions || 30;
+
+  // First available free slot
+  const firstFreeSlot = queueData?.queue?.find((s) => s.is_free)?.position || 1;
 
   const handleSlotClick = (
     slotPos: number,
@@ -95,13 +92,8 @@ export function QueueSlotsModal({
   ) => {
     haptic.selection();
 
-    // 1. Join free slot if not in queue
+    // 1. Join free slot
     if (isFree && !myPosition && user?.tg_id && subject) {
-      if (queueData?.is_paused) {
-        haptic.warning();
-        toast.warning("Очередь на паузе. Запись временно приостановлена");
-        return;
-      }
       joinMutation.mutate({
         subject,
         data: { tg_id: user.tg_id, position: slotPos },
@@ -109,22 +101,22 @@ export function QueueSlotsModal({
       return;
     }
 
-    // 2. Click on free slot while already enrolled
+    // 2. Click on free slot while enrolled
     if (isFree && myPosition) {
       haptic.warning();
-      toast.info(`Вы уже записаны на место #${myPosition}. Чтобы сменить место, сначала освободите текущее.`);
+      toast.info(`Вы уже записаны на место ${myPosition}. Сначала освободите его, чтобы сменить.`);
       return;
     }
 
     // 3. Click on own slot
     if (!isFree && slotUserId === user?.tg_id) {
       haptic.light();
-      toast.info(`Это ваше место #${slotPos}`);
+      toast.info(`Это ваше место ${slotPos}`);
       return;
     }
 
-    // 4. Curator kick selection
-    if (isCurator && !isFree && slotUserId && slotUserId !== user?.tg_id) {
+    // 4. Creator kick
+    if (isCreator && !isFree && slotUserId && slotUserId !== user?.tg_id) {
       setSelectedSlotForKick({
         pos: slotPos,
         tgId: slotUserId,
@@ -133,36 +125,27 @@ export function QueueSlotsModal({
       return;
     }
 
-    // 5. Request swap with student ahead
-    if (
-      !isFree &&
-      myPosition &&
-      slotPos < myPosition &&
-      slotUserId &&
-      slotUserId !== user?.tg_id
-    ) {
-      if (queueData?.is_paused) {
-        haptic.warning();
-        toast.warning("Очередь на паузе. Обмен временно приостановлен");
-        return;
-      }
-      onRequestSwap(slotPos, name || `Участник #${slotPos}`);
+    // 5. Swap request
+    if (!isFree && myPosition && slotUserId && slotUserId !== user?.tg_id) {
+      onRequestSwap(slotPos, name || `Участник ${slotPos}`);
       return;
     }
 
-    // 6. Click on student behind
-    if (!isFree && myPosition && slotPos > myPosition && !isCurator) {
+    // 6. Not enrolled
+    if (!isFree && !myPosition && !isCreator) {
       haptic.warning();
-      toast.info("Предложить обмен можно только участникам перед вами");
+      toast.info("Займите свободное место, чтобы предлагать обмен");
       return;
     }
+  };
 
-    // 7. Click on student while not registered
-    if (!isFree && !myPosition && !isCurator) {
-      haptic.warning();
-      toast.info("Чтобы предложить обмен, сначала займите свободное место в очереди");
-      return;
-    }
+  const handleQuickJoinFirst = () => {
+    if (!subject || !user?.tg_id || myPosition) return;
+    haptic.selection();
+    joinMutation.mutate({
+      subject,
+      data: { tg_id: user.tg_id, position: firstFreeSlot },
+    });
   };
 
   const handleLeave = () => {
@@ -173,37 +156,14 @@ export function QueueSlotsModal({
     });
   };
 
-  const handleAdvance = () => {
-    if (!subject || !user?.tg_id) return;
-    advanceMutation.mutate({
-      subject,
-      data: { curator_tg_id: user.tg_id },
-    });
-  };
-
-  const handleTogglePause = () => {
-    if (!subject || !user?.tg_id || !queueData) return;
-    pauseMutation.mutate({
-      subject,
-      data: { curator_tg_id: user.tg_id, paused: !queueData.is_paused },
-    });
-  };
-
-  const handleClearConfirm = () => {
-    if (!subject || !user?.tg_id) return;
-    clearMutation.mutate(
-      { subject, data: { curator_tg_id: user.tg_id } },
-      { onSuccess: () => setConfirmAction(null) }
-    );
-  };
-
   const handleDeleteConfirm = () => {
     if (!subject || !user?.tg_id) return;
     deleteMutation.mutate(
       { subject, curatorTgId: user.tg_id },
       {
         onSuccess: () => {
-          setConfirmAction(null);
+          setIsDeleteDrawerOpen(false);
+          setDeleteInputText("");
           onClose();
         },
       }
@@ -219,8 +179,7 @@ export function QueueSlotsModal({
     setSelectedSlotForKick(null);
   };
 
-  // Generate 30 slots representation
-  const slots = Array.from({ length: 30 }, (_, i) => {
+  const slots = Array.from({ length: totalPositions }, (_, i) => {
     const pos = i + 1;
     const existing = queueData?.queue?.find((s) => s.position === pos);
     const isFree = existing ? existing.is_free : true;
@@ -237,155 +196,96 @@ export function QueueSlotsModal({
   return (
     <>
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent>
-          <DrawerHeader>
-            <div className="flex items-center justify-between">
-              <DrawerTitle>{subject}</DrawerTitle>
-              <div className="flex items-center gap-1">
-                {queueData?.is_paused && <Badge variant="warning">Пауза</Badge>}
+        <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
+          <DrawerHeader className="px-6 pt-6 pb-2">
+            <div className="flex items-center justify-between gap-3">
+              <DrawerTitle className="text-xl font-bold tracking-tight text-foreground truncate">
+                {subject}
+              </DrawerTitle>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isCreator && (
+                  <Badge variant="subtle">
+                    Создатель
+                  </Badge>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 text-muted-foreground"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl"
                   onClick={() => {
                     if (!subject) return;
                     navigator.clipboard.writeText(subject);
                     haptic.light();
-                    toast.info("Название очереди скопировано");
+                    toast.info("Название скопировано");
                   }}
                   title="Скопировать название"
-                  aria-label="Скопировать название очереди"
+                  aria-label="Скопировать название"
                 >
-                  <Copy size={14} />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs text-muted-foreground"
-                  onClick={() => setIsHistoryOpen(true)}
-                >
-                  <Clock size={14} />
-                  Инфо
+                  <Copy size={16} />
                 </Button>
               </div>
             </div>
-            <DrawerDescription>
-              {isCurator
-                ? "Управление очередью. Нажмите на участника для исключения."
+            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1">
+              {isCreator
+                ? "Вы создали эту очередь. Нажмите на участника, чтобы исключить его."
                 : myPosition
-                ? "Нажмите на участника перед вами для предложения обмена."
-                : "Нажмите на свободный слот, чтобы занять очередь."}
+                ? "Нажмите на любого участника для предложения обмена местами."
+                : "Выберите свободный номер или нажмите кнопку ниже."}
             </DrawerDescription>
           </DrawerHeader>
 
           {/* Kick Confirmation Bar */}
-          {selectedSlotForKick && isCurator && (
-            <div className="mx-5 mb-2 bg-rose-500/10 rounded-2xl p-3 flex items-center justify-between text-xs">
-              <span className="font-medium text-rose-600 dark:text-rose-400">
-                Исключить {selectedSlotForKick.name} (место #{selectedSlotForKick.pos})?
+          {selectedSlotForKick && isCreator && (
+            <div className="mx-6 mb-3 bg-destructive/10 rounded-2xl p-3.5 flex items-center justify-between text-xs animate-in fade-in">
+              <span className="font-semibold text-destructive">
+                Исключить {selectedSlotForKick.name} (место {selectedSlotForKick.pos})?
               </span>
-              <div className="flex items-center gap-1.5">
-                <Button size="sm" variant="destructive" onClick={handleKickConfirm}>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="destructive" className="h-8 rounded-xl px-3" onClick={handleKickConfirm}>
                   Исключить
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
+                  className="h-8 w-8 p-0 rounded-xl"
                   onClick={() => setSelectedSlotForKick(null)}
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Clear or Delete Confirmation Bar */}
-          {confirmAction && isCurator && (
-            <div className="mx-5 mb-2 bg-rose-500/10 rounded-2xl p-3 flex items-center justify-between text-xs">
-              <span className="font-medium text-rose-600 dark:text-rose-400">
-                {confirmAction === "clear"
-                  ? "Очистить всех участников из очереди?"
-                  : "Удалить очередь безвозвратно?"}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={
-                    confirmAction === "clear" ? handleClearConfirm : handleDeleteConfirm
-                  }
-                >
-                  Подтвердить
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmAction(null)}
-                >
-                  <X size={14} />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Slots Grid */}
-          <div className="flex flex-col gap-3 px-5 py-2 max-h-[55vh] overflow-y-auto">
+          {/* Slots Container */}
+          <div className="flex flex-col gap-4 px-6 py-2 max-h-[50vh] overflow-y-auto no-scrollbar">
             {isErrorQueue ? (
               <RetryBanner
-                message="Ошибка загрузки слотов очереди"
+                message="Ошибка загрузки слотов"
                 onRetry={() => refetchQueue()}
               />
             ) : isLoading ? (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Слоты сдачи (1-30)</span>
-                  <span>Загрузка...</span>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {Array.from({ length: 30 }).map((_, i) => (
-                    <Skeleton key={i} className="h-11 rounded-xl" />
-                  ))}
-                </div>
+              <div className="grid grid-cols-5 gap-2.5 py-2">
+                {Array.from({ length: 20 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 rounded-2xl" />
+                ))}
               </div>
             ) : (
               <>
-                {/* Slot Search Input */}
-                <div className="relative">
-                  <MagnifyingGlass
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Поиск по имени или номеру места..."
-                    value={slotSearch}
-                    onChange={(e) => setSlotSearch(e.target.value)}
-                    className="w-full bg-secondary/50 rounded-xl pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:bg-secondary/70 transition-all text-foreground placeholder:text-muted-foreground/50"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-                  <span>Слоты сдачи (1-30)</span>
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-medium pt-1">
+                  <span>Список мест</span>
                   <span>
-                    {queueData?.taken_positions || 0} из 30 занято
+                    Занято {queueData?.taken_positions || 0} из {totalPositions}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-2.5 pb-2">
                   {slots.map((slot) => {
-                    let bgClass = "bg-secondary/40 text-muted-foreground hover:bg-secondary/70";
+                    let bgClass = "bg-secondary text-muted-foreground hover:bg-secondary/80";
                     if (slot.isMe) {
-                      bgClass = "bg-primary text-primary-foreground font-semibold shadow-sm";
+                      bgClass = "bg-primary text-primary-foreground font-semibold";
                     } else if (!slot.isFree) {
-                      bgClass = "bg-secondary text-foreground hover:bg-secondary/80 font-medium";
+                      bgClass = "bg-card text-foreground hover:bg-secondary font-medium";
                     }
-
-                    const query = slotSearch.trim().toLowerCase();
-                    const isMatched =
-                      !query ||
-                      String(slot.pos) === query ||
-                      String(slot.pos).startsWith(query) ||
-                      (slot.name && slot.name.toLowerCase().includes(query));
 
                     return (
                       <button
@@ -393,12 +293,10 @@ export function QueueSlotsModal({
                         onClick={() =>
                           handleSlotClick(slot.pos, slot.isFree, slot.tgId, slot.name)
                         }
-                        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-150 active:scale-95 text-center select-none ${bgClass} ${
-                          isMatched ? "opacity-100" : "opacity-25"
-                        }`}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-2xl min-h-[58px] transition-all duration-150 active:scale-95 text-center select-none ${bgClass}`}
                       >
-                        <span className="text-xs font-semibold leading-none">{slot.pos}</span>
-                        <span className="text-[10px] truncate max-w-full mt-1 opacity-80">
+                        <span className="text-sm font-bold leading-none">{slot.pos}</span>
+                        <span className="text-[10px] truncate max-w-full mt-1.5 opacity-80 font-medium">
                           {slot.isMe ? "Вы" : slot.isFree ? "Свободно" : slot.name?.split(" ")[0]}
                         </span>
                       </button>
@@ -409,85 +307,68 @@ export function QueueSlotsModal({
             )}
           </div>
 
-          <DrawerFooter>
-            {/* Curator Control Toolbar */}
-            {isCurator && (
-              <div className="flex flex-col gap-2 pt-2 border-t border-border/20">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={handleAdvance}
-                    disabled={advanceMutation.isPending || !queueData?.taken_positions}
-                  >
-                    <FastForward size={14} weight="bold" />
-                    Следующий
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="subtle"
-                    onClick={handleTogglePause}
-                    disabled={pauseMutation.isPending}
-                  >
-                    {queueData?.is_paused ? (
-                      <>
-                        <Play size={14} weight="fill" />
-                        Возобновить
-                      </>
-                    ) : (
-                      <>
-                        <Pause size={14} weight="fill" />
-                        Пауза
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    size="sm"
-                    variant="subtle"
-                    onClick={() => setConfirmAction("clear")}
-                    disabled={clearMutation.isPending || !queueData?.taken_positions}
-                  >
-                    <Trash size={14} />
-                    Очистить
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setConfirmAction("delete")}
-                    disabled={deleteMutation.isPending}
-                  >
-                    Удалить очередь
-                  </Button>
-                </div>
-
+          <DrawerFooter className="px-6 pt-5 pb-12 mb-3 flex flex-col gap-3">
+            {/* Creator actions */}
+            {isCreator && (
+              <div className="grid grid-cols-2 gap-2 w-full">
                 <Button
                   size="sm"
-                  variant="subtle"
+                  variant="secondary"
+                  className="rounded-2xl h-11 text-xs font-semibold gap-1.5"
                   onClick={() => setIsDirectSwapOpen(true)}
                   disabled={!queueData?.taken_positions || queueData.taken_positions < 2}
+                  disabledReason={
+                    !queueData?.taken_positions || queueData.taken_positions < 2
+                      ? "Нужно минимум 2 участника для прямого обмена"
+                      : undefined
+                  }
                 >
-                  Прямой обмен мест
+                  <ArrowsLeftRight size={16} weight="bold" />
+                  Обмен мест
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="rounded-2xl h-11 text-xs font-semibold gap-1.5"
+                  onClick={() => setIsDeleteDrawerOpen(true)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash size={16} weight="bold" />
+                  Удалить очередь
                 </Button>
               </div>
             )}
 
-            {/* Student Actions */}
-            <div className="flex items-center gap-2 pt-1">
-              {myPosition && (
+            {/* Student actions: Quick join or leave */}
+            <div className="flex items-center gap-2.5 w-full">
+              {!myPosition ? (
+                <Button
+                  variant="default"
+                  className="flex-1 rounded-2xl h-12 text-sm font-semibold gap-2"
+                  onClick={handleQuickJoinFirst}
+                  disabled={joinMutation.isPending || queueData?.taken_positions === totalPositions}
+                  disabledReason={
+                    queueData?.taken_positions === totalPositions
+                      ? "Все места в этой очереди уже заняты"
+                      : undefined
+                  }
+                >
+                  <UserPlus size={18} weight="bold" />
+                  Занять свободное (место {firstFreeSlot})
+                </Button>
+              ) : (
                 <Button
                   variant="destructive"
-                  className="flex-1"
+                  className="flex-1 rounded-2xl h-12 text-sm font-semibold"
                   onClick={handleLeave}
                   disabled={leaveMutation.isPending}
                 >
-                  Выйти из очереди
+                  Покинуть место {myPosition}
                 </Button>
               )}
+
               <DrawerClose asChild>
-                <Button variant="secondary" className="flex-1">
+                <Button variant="secondary" className="px-5 rounded-2xl h-12 text-sm font-medium">
                   Закрыть
                 </Button>
               </DrawerClose>
@@ -496,12 +377,58 @@ export function QueueSlotsModal({
         </DrawerContent>
       </Drawer>
 
-      {/* History and Stats Drawer */}
-      <QueueHistoryDrawer
-        subject={subject}
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-      />
+      {/* Separate Dedicated Delete Confirmation Drawer */}
+      <Drawer
+        open={isDeleteDrawerOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsDeleteDrawerOpen(false);
+            setDeleteInputText("");
+          }
+        }}
+      >
+        <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
+          <DrawerHeader className="px-6 pt-6 pb-2 text-center sm:text-left">
+            <DrawerTitle className="text-xl font-bold tracking-tight text-destructive">
+              Удаление очереди
+            </DrawerTitle>
+            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1">
+              Очередь «{subject}» будет безвозвратно удалена, а все участники потеряют свои места.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-6 py-4 flex flex-col gap-3">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Для подтверждения введите слово «удалить»
+            </label>
+            <input
+              type="text"
+              placeholder="удалить"
+              value={deleteInputText}
+              onChange={(e) => setDeleteInputText(e.target.value)}
+              className="w-full bg-secondary rounded-2xl px-4 py-3.5 text-sm font-medium text-foreground focus:ring-2 focus:ring-destructive/30 border-0 outline-none"
+              autoFocus
+            />
+          </div>
+
+          <DrawerFooter className="px-6 pt-4 pb-12 mb-3 flex flex-col gap-3">
+            <Button
+              variant="destructive"
+              className="w-full rounded-2xl h-12 text-sm font-semibold"
+              onClick={handleDeleteConfirm}
+              disabled={deleteInputText.trim().toLowerCase() !== "удалить" || deleteMutation.isPending}
+              disabledReason="Введите слово «удалить»"
+            >
+              {deleteMutation.isPending ? "Удаление..." : "Подтвердить удаление"}
+            </Button>
+            <DrawerClose asChild>
+              <Button variant="secondary" className="w-full rounded-2xl h-12 text-sm font-medium">
+                Отмена
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       {/* Direct Curator Swap Drawer */}
       <DirectSwapDrawer

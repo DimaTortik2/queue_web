@@ -1,69 +1,66 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import {
-  ShieldCheck,
-  BookOpen,
   Trash,
   Plus,
-  Users,
-  MagnifyingGlass,
-  Check,
   PencilSimple,
-  Copy,
+  Check,
   X,
-  Sliders,
+  Sun,
+  Moon,
+  Desktop,
   Vibrate,
-  Star,
   ArrowsClockwise,
+  Palette,
+  Users,
 } from "@phosphor-icons/react";
 import { useUserStore } from "@/store/userStore";
-import { usePreferencesStore } from "@/store/preferencesStore";
-import { Badge } from "@/components/ui/badge";
+import {
+  usePreferencesStore,
+  DEFAULT_ACCENT_HEX,
+} from "@/store/preferencesStore";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { haptic } from "@/lib/telegram";
-import { api } from "@/services/api";
+import { haptic, tg } from "@/lib/telegram";
 import {
   useSubjectsList,
   useCreateSubjectMutation,
   useDeleteSubjectMutation,
   useUsersList,
-  useSetRoleMutation,
-  useDeleteUserMutation,
 } from "@/hooks/useQueueApi";
+import { UserResponse } from "@/types";
 
 export function ProfileView() {
-  const { user, setUser, switchMockUser, setCustomDevUser } = useUserStore();
-  const [customTgIdInput, setCustomTgIdInput] = useState("");
+  const { user, setUser, updateUserName } = useUserStore();
   const {
+    theme,
+    setTheme,
+    accentMode,
+    setAccentMode,
+    customColor,
+    setCustomColor,
     hapticsEnabled,
     toggleHaptics,
-    pinnedSubjects,
-    unpinAllSubjects,
     resetPreferences,
   } = usePreferencesStore();
-  const [newSubjectName, setNewSubjectName] = useState("");
-  const [userSearch, setUserSearch] = useState("");
-  const [userRoleFilter, setUserRoleFilter] = useState<string | null>(null);
 
+  const [newSubjectName, setNewSubjectName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
+  const [subjectToDelete, setSubjectToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [isSwitchUserOpen, setIsSwitchUserOpen] = useState(false);
 
   const { data: subjectsData, isLoading: isLoadingSubjects } = useSubjectsList();
-  const { data: usersData, isLoading: isLoadingUsers } = useUsersList({
-    search: userSearch.trim() || undefined,
-    role: userRoleFilter || undefined,
-  });
-
+  const { data: usersData, isLoading: isLoadingUsers } = useUsersList();
   const createSubjectMutation = useCreateSubjectMutation();
   const deleteSubjectMutation = useDeleteSubjectMutation();
-  const setRoleMutation = useSetRoleMutation();
-  const deleteUserMutation = useDeleteUserMutation();
 
   const subjects = subjectsData?.subject_list || [];
-  const usersList = usersData?.users || [];
-  const isCurator = user?.role === "curator";
+  const allUsers = usersData?.users || [];
+
+  // Security check: only allow switching user in local dev browser (no real Telegram Mini App context)
+  const isDevBrowserMode = !tg()?.initData;
 
   const handleStartEditName = () => {
     haptic.selection();
@@ -72,13 +69,12 @@ export function ProfileView() {
   };
 
   const handleSaveName = async () => {
-    if (!user?.tg_id || !nameInput.trim()) return;
+    if (!nameInput.trim()) return;
     setIsSavingName(true);
     try {
-      await api.updateUser(user.tg_id, { name: nameInput.trim() });
-      setUser({ ...user, name: nameInput.trim() });
+      await updateUserName(nameInput.trim());
       haptic.success();
-      toast.success("Имя профиля сохранено");
+      toast.success("Имя профиля обновлено");
       setIsEditingName(false);
     } catch {
       haptic.error();
@@ -88,313 +84,411 @@ export function ProfileView() {
     }
   };
 
-  const handleCopyTgId = () => {
-    if (!user?.tg_id) return;
-    navigator.clipboard.writeText(String(user.tg_id));
-    haptic.success();
-    toast.info("Telegram ID скопирован");
-  };
-
   const handleAddSubject = () => {
     if (!newSubjectName.trim()) return;
     createSubjectMutation.mutate(newSubjectName.trim(), {
-      onSuccess: () => setNewSubjectName(""),
+      onSuccess: () => {
+        setNewSubjectName("");
+        haptic.success();
+        toast.success("Предмет добавлен");
+      },
     });
   };
 
-  const handleDeleteSubject = (id: number) => {
-    deleteSubjectMutation.mutate(id);
+  const handleDeleteSubjectConfirm = () => {
+    if (!subjectToDelete) return;
+    haptic.warning();
+    deleteSubjectMutation.mutate(subjectToDelete.id, {
+      onSuccess: () => {
+        setSubjectToDelete(null);
+        toast.info("Предмет удален из каталога");
+      },
+    });
   };
 
-  const handleToggleUserRole = (targetTgId: number, currentRole: string) => {
+  const handleSelectUser = (u: UserResponse) => {
     haptic.selection();
-    const nextRole = currentRole === "curator" ? "student" : "curator";
-    setRoleMutation.mutate({
-      tgId: targetTgId,
-      data: { role: nextRole },
-    });
+    setUser(u);
+    setIsSwitchUserOpen(false);
+    toast.success(`Переключено на: ${u.name}`);
   };
 
   return (
-    <div className="flex flex-col gap-4 px-4 pt-4 pb-28 max-w-lg mx-auto w-full select-none">
-      <div className="flex flex-col gap-0.5 pt-1">
-        <span className="text-base font-semibold tracking-tight">Профиль и управление</span>
-        <span className="text-xs text-muted-foreground">Данные аккаунта и настройки</span>
-      </div>
+    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none">
+      {/* Header */}
+      <header className="flex flex-col gap-1">
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          Профиль
+        </h1>
+        <p className="text-xs text-muted-foreground font-medium">
+          Аккаунт и настройки приложения
+        </p>
+      </header>
 
-      {/* User Information Card */}
-      <div className="bg-secondary/30 rounded-2xl p-4 flex flex-col gap-3">
-        {/* Name with inline editing */}
+      {/* Account Info Card */}
+      <div className="bg-card rounded-2xl p-5 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <div className="flex flex-col flex-1 mr-2">
-            <span className="text-xs text-muted-foreground">Имя пользователя</span>
+          <div className="flex flex-col flex-1 mr-3 min-w-0">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Ваш аккаунт
+            </span>
             {isEditingName ? (
-              <div className="flex items-center gap-1.5 pt-1">
+              <div className="flex items-center gap-2 pt-1.5">
                 <input
                   type="text"
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   placeholder="Ваше имя..."
-                  className="flex-1 bg-secondary/60 rounded-xl px-3 py-1.5 text-xs text-foreground focus:outline-none focus:bg-secondary/80"
+                  className="flex-1 bg-secondary rounded-xl px-3.5 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary/20 border-0 outline-none"
                   autoFocus
                 />
-                <button
+                <Button
+                  size="sm"
+                  variant="default"
                   onClick={handleSaveName}
                   disabled={isSavingName || !nameInput.trim()}
-                  className="p-1.5 text-foreground hover:opacity-80 active:scale-95 transition-all"
-                  title="Сохранить"
+                  className="h-9 w-9 p-0 rounded-xl"
                 >
-                  <Check size={14} weight="bold" />
-                </button>
-                <button
+                  <Check size={16} weight="bold" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => setIsEditingName(false)}
-                  className="p-1.5 text-muted-foreground hover:opacity-80 active:scale-95 transition-all"
-                  title="Отмена"
+                  className="h-9 w-9 p-0 rounded-xl"
                 >
-                  <X size={14} />
-                </button>
+                  <X size={16} />
+                </Button>
               </div>
             ) : (
-              <span className="text-sm font-semibold tracking-tight">{user?.name}</span>
+              <span className="text-base font-bold tracking-tight text-foreground truncate mt-0.5">
+                {user?.name}
+              </span>
             )}
           </div>
-          {!isEditingName && (
-            <button
-              onClick={handleStartEditName}
-              className="p-1.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-              title="Изменить имя"
-            >
-              <PencilSimple size={14} />
-            </button>
-          )}
+
+          <div className="flex items-center gap-1">
+            {!isEditingName && (
+              <button
+                onClick={handleStartEditName}
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all"
+                title="Изменить имя"
+              >
+                <PencilSimple size={18} />
+              </button>
+            )}
+            {/* Switch user ONLY visible in desktop dev browser, NEVER in Telegram production */}
+            {isDevBrowserMode && (
+              <button
+                onClick={() => setIsSwitchUserOpen(!isSwitchUserOpen)}
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all"
+                title="Сменить тестового пользователя (только в браузере)"
+              >
+                <Users size={18} />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Telegram ID with one-click copy */}
-        <div
-          onClick={handleCopyTgId}
-          className="flex items-center justify-between cursor-pointer hover:opacity-80 transition-opacity"
-        >
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">Telegram ID</span>
-            <span className="text-sm font-mono">{user?.tg_id}</span>
+        {/* Switch Account Box - Only visible in Dev browser */}
+        {isDevBrowserMode && isSwitchUserOpen && (
+          <div className="bg-secondary/70 rounded-2xl p-3 flex flex-col gap-2 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground">
+                Тестовые аккаунты (dev-режим):
+              </span>
+              <button
+                onClick={() => setIsSwitchUserOpen(false)}
+                className="text-muted-foreground hover:text-foreground p-1"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto no-scrollbar">
+              {isLoadingUsers ? (
+                <Skeleton className="h-8 w-full rounded-xl" />
+              ) : allUsers.length > 0 ? (
+                allUsers.map((u) => {
+                  const isCurrent = u.tg_id === user?.tg_id;
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => handleSelectUser(u)}
+                      className={`flex items-center justify-between p-2 rounded-xl text-xs font-medium text-left transition-all ${
+                        isCurrent
+                          ? "bg-foreground text-background font-semibold"
+                          : "hover:bg-secondary text-foreground"
+                      }`}
+                    >
+                      <span className="truncate">{u.name}</span>
+                      {isCurrent && <span className="text-[10px] opacity-75">Текущий</span>}
+                    </button>
+                  );
+                })
+              ) : (
+                <span className="text-xs text-muted-foreground">Пользователи не найдены</span>
+              )}
+            </div>
           </div>
+        )}
+      </div>
+
+      {/* Theme Selection */}
+      <div className="bg-card rounded-2xl p-5 flex flex-col gap-3.5">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Тема оформления
+        </span>
+
+        <div className="grid grid-cols-3 gap-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopyTgId();
+            onClick={() => {
+              haptic.selection();
+              setTheme("system");
             }}
-            className="p-1.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-            title="Скопировать ID"
+            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl text-xs font-semibold transition-all ${
+              theme === "system"
+                ? "bg-foreground text-background"
+                : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+            }`}
           >
-            <Copy size={14} />
+            <Desktop size={20} weight={theme === "system" ? "fill" : "regular"} />
+            <span>Системная</span>
+          </button>
+
+          <button
+            onClick={() => {
+              haptic.selection();
+              setTheme("light");
+            }}
+            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl text-xs font-semibold transition-all ${
+              theme === "light"
+                ? "bg-foreground text-background"
+                : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+            }`}
+          >
+            <Sun size={20} weight={theme === "light" ? "fill" : "regular"} />
+            <span>Светлая</span>
+          </button>
+
+          <button
+            onClick={() => {
+              haptic.selection();
+              setTheme("dark");
+            }}
+            className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl text-xs font-semibold transition-all ${
+              theme === "dark"
+                ? "bg-foreground text-background"
+                : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+            }`}
+          >
+            <Moon size={20} weight={theme === "dark" ? "fill" : "regular"} />
+            <span>Темная</span>
           </button>
         </div>
+      </div>
 
-        {/* Role badge */}
-        <div className="flex flex-col">
-          <span className="text-xs text-muted-foreground">Текущая роль</span>
-          <div className="pt-1">
-            <Badge variant={isCurator ? "default" : "secondary"}>
-              {isCurator ? "Куратор" : "Студент"}
-            </Badge>
+      {/* Accent Color Selection */}
+      <div className="bg-card rounded-2xl p-5 flex flex-col gap-3.5">
+        <div className="flex items-center gap-2">
+          <Palette size={18} className="text-primary" weight="bold" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Цвет акцента
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Default purple */}
+          <button
+            type="button"
+            onClick={() => {
+              haptic.selection();
+              setAccentMode("default");
+            }}
+            className={`flex items-center justify-between p-3.5 rounded-xl text-xs font-semibold transition-all ${
+              accentMode === "default"
+                ? "bg-secondary text-foreground ring-2 ring-primary"
+                : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-4 h-4 rounded-full shrink-0 border border-black/10 dark:border-white/10"
+                style={{ backgroundColor: DEFAULT_ACCENT_HEX }}
+              />
+              <span>По умолчанию</span>
+            </div>
+            {accentMode === "default" && (
+              <span className="text-[10px] text-primary font-bold">Активен</span>
+            )}
+          </button>
+
+          {/* Custom user color */}
+          <div
+            className={`relative flex items-center justify-between p-3.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              accentMode === "custom"
+                ? "bg-secondary text-foreground ring-2 ring-primary"
+                : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+            }`}
+            onClick={() => {
+              if (accentMode !== "custom") {
+                haptic.selection();
+                setAccentMode("custom");
+              }
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <label
+                className="relative cursor-pointer shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="color"
+                  value={customColor}
+                  onChange={(e) => {
+                    setCustomColor(e.target.value);
+                  }}
+                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                />
+                <div
+                  className="w-4 h-4 rounded-full border border-black/20 dark:border-white/20 shadow-sm"
+                  style={{ backgroundColor: customColor }}
+                  title="Выбрать свой цвет"
+                />
+              </label>
+              <span className="truncate">Свой</span>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <label
+                className="relative cursor-pointer flex items-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="color"
+                  value={customColor}
+                  onChange={(e) => {
+                    setCustomColor(e.target.value);
+                  }}
+                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+                />
+                <span className="text-[10px] font-mono opacity-80 uppercase hover:text-primary transition-colors">
+                  {customColor}
+                </span>
+              </label>
+              {accentMode === "custom" && (
+                <span className="text-[10px] text-primary font-bold ml-1">Активен</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Subject Catalog Management (Curator Section) */}
-      {isCurator && (
-        <div className="bg-secondary/30 rounded-2xl p-4 flex flex-col gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            <BookOpen size={16} />
-            <span>Каталог предметов</span>
-          </div>
+      {/* Subject Catalog Management */}
+      <div className="bg-card rounded-2xl p-5 flex flex-col gap-4">
+        <div className="flex flex-col">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Предметы
+          </span>
+          <span className="text-xs text-muted-foreground mt-0.5">
+            Каталог учебных дисциплин для очередей
+          </span>
+        </div>
 
-          {/* Add Subject Input */}
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              type="text"
-              placeholder="Новый предмет (например: Физика)"
-              value={newSubjectName}
-              onChange={(e) => setNewSubjectName(e.target.value)}
-              className="flex-1 bg-secondary/50 rounded-xl px-4 py-2 text-xs focus:outline-none focus:bg-secondary/70 transition-all placeholder:text-muted-foreground/50 text-foreground"
-            />
-            <Button
-              size="sm"
-              variant="default"
-              onClick={handleAddSubject}
-              disabled={createSubjectMutation.isPending || !newSubjectName.trim()}
-            >
-              <Plus size={14} weight="bold" />
-              Добавить
-            </Button>
-          </div>
+        {/* Add Subject Input */}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Название предмета..."
+            value={newSubjectName}
+            onChange={(e) => setNewSubjectName(e.target.value)}
+            className="flex-1 bg-secondary rounded-xl px-4 py-3 text-xs font-medium focus:bg-card focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground/50 border-0 outline-none"
+          />
+          <Button
+            size="sm"
+            variant="default"
+            onClick={handleAddSubject}
+            disabled={createSubjectMutation.isPending || !newSubjectName.trim()}
+            disabledReason="Введите название нового предмета"
+            className="rounded-xl px-4 h-10 text-xs font-semibold gap-1"
+          >
+            <Plus size={14} weight="bold" />
+            Добавить
+          </Button>
+        </div>
 
-          {/* Subjects List */}
-          <div className="flex flex-col gap-1.5 pt-1 max-h-40 overflow-y-auto">
-            {isLoadingSubjects ? (
-              <div className="flex flex-col gap-1.5">
-                <Skeleton className="h-9 w-full rounded-xl" />
-                <Skeleton className="h-9 w-full rounded-xl" />
-              </div>
-            ) : subjects.length > 0 ? (
-              subjects.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl"
+        {/* Delete Confirmation Box */}
+        {subjectToDelete && (
+          <div className="bg-destructive/10 rounded-xl p-3 flex items-center justify-between text-xs animate-in fade-in">
+            <span className="font-semibold text-destructive">
+              Удалить предмет «{subjectToDelete.name}»?
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-8 px-3 rounded-lg text-xs"
+                onClick={handleDeleteSubjectConfirm}
+                disabled={deleteSubjectMutation.isPending}
+              >
+                Удалить
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-8 px-2.5 rounded-lg text-xs"
+                onClick={() => setSubjectToDelete(null)}
+              >
+                Отмена
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Subjects List */}
+        <div className="flex flex-col gap-2 max-h-48 overflow-y-auto no-scrollbar">
+          {isLoadingSubjects ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-10 w-full rounded-xl" />
+              <Skeleton className="h-10 w-full rounded-xl" />
+            </div>
+          ) : subjects.length > 0 ? (
+            subjects.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary rounded-xl transition-all"
+              >
+                <span className="text-xs font-semibold text-foreground">{s.name}</span>
+                <button
+                  onClick={() => {
+                    haptic.selection();
+                    setSubjectToDelete(s);
+                  }}
+                  className="text-muted-foreground/60 hover:text-destructive p-1 rounded-lg transition-colors"
+                  title="Удалить предмет"
                 >
-                  <span className="text-xs font-medium">{s.name}</span>
-                  <button
-                    onClick={() => handleDeleteSubject(s.id)}
-                    className="text-muted-foreground hover:text-rose-500 transition-colors p-1"
-                  >
-                    <Trash size={14} />
-                  </button>
-                </div>
-              ))
-            ) : (
-              <span className="text-xs text-muted-foreground">Каталог пока пуст</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* User & Role Management (Curator Section) */}
-      {isCurator && (
-        <div className="bg-secondary/30 rounded-2xl p-4 flex flex-col gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            <Users size={16} />
-            <span>Управление ролями пользователей</span>
-          </div>
-
-          {/* User Search & Filter */}
-          <div className="relative">
-            <MagnifyingGlass
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              type="text"
-              placeholder="Поиск по имени..."
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              className="w-full bg-secondary/50 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:bg-secondary/70 transition-all placeholder:text-muted-foreground/50 text-foreground"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setUserRoleFilter(null)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-all ${
-                userRoleFilter === null
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "bg-secondary/40 text-muted-foreground"
-              }`}
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setUserRoleFilter("student")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-all ${
-                userRoleFilter === "student"
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "bg-secondary/40 text-muted-foreground"
-              }`}
-            >
-              Студенты
-            </button>
-            <button
-              onClick={() => setUserRoleFilter("curator")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-all ${
-                userRoleFilter === "curator"
-                  ? "bg-primary text-primary-foreground font-medium"
-                  : "bg-secondary/40 text-muted-foreground"
-              }`}
-            >
-              Кураторы
-            </button>
-          </div>
-
-          {/* User Cards List */}
-          <div className="flex flex-col gap-1.5 pt-1 max-h-48 overflow-y-auto">
-            {isLoadingUsers ? (
-              <div className="flex flex-col gap-1.5">
-                <Skeleton className="h-12 w-full rounded-xl" />
-                <Skeleton className="h-12 w-full rounded-xl" />
+                  <Trash size={15} />
+                </button>
               </div>
-            ) : usersList.length > 0 ? (
-              usersList.map((u) => {
-                const isTargetCurator = u.role === "curator";
-                const isSelf = u.tg_id === user?.tg_id;
-
-                return (
-                  <div
-                    key={u.id}
-                    className="flex items-center justify-between p-2.5 bg-secondary/40 rounded-xl"
-                  >
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-medium">{u.name}</span>
-                        {isSelf && <span className="text-[10px] text-muted-foreground">(Вы)</span>}
-                      </div>
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        TG: {u.tg_id}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Badge variant={isTargetCurator ? "default" : "secondary"}>
-                        {isTargetCurator ? "Куратор" : "Студент"}
-                      </Badge>
-
-                      {!isSelf && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="subtle"
-                            className="h-7 px-2 text-[11px]"
-                            onClick={() => handleToggleUserRole(u.tg_id, u.role)}
-                            disabled={setRoleMutation.isPending}
-                          >
-                            <Check size={12} weight="bold" />
-                            {isTargetCurator ? "В студенты" : "В кураторы"}
-                          </Button>
-                          <button
-                            onClick={() => {
-                              haptic.warning();
-                              deleteUserMutation.mutate(u.tg_id);
-                            }}
-                            className="text-muted-foreground hover:text-rose-500 transition-colors p-1"
-                          >
-                            <Trash size={14} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <span className="text-xs text-muted-foreground">Пользователи не найдены</span>
-            )}
-          </div>
+            ))
+          ) : (
+            <span className="text-xs text-muted-foreground py-2 text-center">
+              Каталог предметов пуст
+            </span>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Interface and Preferences Section */}
-      <div className="bg-secondary/30 rounded-2xl p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          <Sliders size={16} />
-          <span>Настройки интерфейса</span>
-        </div>
-
-        {/* Haptics Toggle */}
-        <div className="flex items-center justify-between py-1">
-          <div className="flex items-center gap-2">
-            <Vibrate size={18} className="text-muted-foreground" />
+      {/* Tactile and Reset Options */}
+      <div className="bg-card rounded-2xl p-5 flex flex-col gap-4">
+        {/* Haptics Toggle with adaptive high-contrast handle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Vibrate size={20} className="text-muted-foreground" />
             <div className="flex flex-col">
-              <span className="text-xs font-medium">Тактильный виброотклик</span>
-              <span className="text-[10px] text-muted-foreground">
-                Вибрация при тапах и системных событиях
+              <span className="text-xs font-semibold text-foreground">Виброотклик</span>
+              <span className="text-[11px] text-muted-foreground">
+                Тактильная отдача в Telegram
               </span>
             </div>
           </div>
@@ -403,131 +497,39 @@ export function ProfileView() {
               toggleHaptics();
               if (!hapticsEnabled) haptic.success();
             }}
-            className={`w-11 h-6 rounded-full transition-colors relative ${
-              hapticsEnabled ? "bg-primary" : "bg-secondary/80"
+            className={`w-12 h-7 rounded-full transition-colors relative ${
+              hapticsEnabled ? "bg-primary" : "bg-secondary"
             }`}
-            title="Переключить виброотклик"
-            aria-label="Переключить виброотклик"
           >
+            {/* High-contrast handle that dynamically adapts and never merges with the track */}
             <div
-              className={`w-4 h-4 rounded-full bg-background transition-transform duration-150 absolute top-1 ${
-                hapticsEnabled ? "left-6" : "left-1"
+              className={`w-5 h-5 rounded-full shadow-sm transition-transform duration-150 absolute top-1 border border-black/15 dark:border-white/15 ${
+                hapticsEnabled
+                  ? "left-6 bg-primary-foreground"
+                  : "left-1 bg-foreground/70"
               }`}
             />
           </button>
         </div>
 
-        {/* Pinned Queues Status */}
-        <div className="flex items-center justify-between py-1 border-t border-border/20 pt-2.5">
-          <div className="flex items-center gap-2">
-            <Star size={18} className="text-muted-foreground" />
-            <div className="flex flex-col">
-              <span className="text-xs font-medium">Закрепленные очереди</span>
-              <span className="text-[10px] text-muted-foreground">
-                {pinnedSubjects.length > 0
-                  ? `Закреплено: ${pinnedSubjects.length}`
-                  : "Нет закрепленных очередей"}
-              </span>
-            </div>
-          </div>
-          {pinnedSubjects.length > 0 && (
-            <Button
-              size="sm"
-              variant="subtle"
-              className="text-xs h-7"
-              onClick={() => {
-                haptic.light();
-                unpinAllSubjects();
-                toast.info("Все очереди откреплены");
-              }}
-            >
-              Открепить все
-            </Button>
-          )}
-        </div>
-
         {/* Reset Preferences */}
-        <div className="flex items-center justify-between border-t border-border/20 pt-2.5">
-          <span className="text-xs text-muted-foreground">
-            Сброс локальных параметров
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-xs text-muted-foreground font-medium">
+            Сброс настроек
           </span>
           <Button
             size="sm"
             variant="ghost"
-            className="text-xs h-7 text-rose-500 hover:text-rose-600"
+            className="text-xs text-destructive hover:bg-destructive/10 rounded-xl h-8 font-semibold"
             onClick={() => {
               haptic.warning();
               resetPreferences();
-              toast.info("Настройки интерфейса сброшены");
+              toast.info("Настройки сброшены");
             }}
           >
-            <ArrowsClockwise size={12} className="mr-1" />
+            <ArrowsClockwise size={14} className="mr-1" />
             Сбросить
           </Button>
-        </div>
-      </div>
-
-      {/* Dev Mode Switcher */}
-      <div className="bg-secondary/30 rounded-2xl p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          <ShieldCheck size={16} />
-          <span>Переключение роли (Dev Mode)</span>
-        </div>
-        <span className="text-xs text-muted-foreground">
-          Эмуляция студента и куратора для тестирования очередей в браузере:
-        </span>
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <Button
-            size="sm"
-            variant={user?.role === "student" ? "default" : "subtle"}
-            onClick={() => {
-              haptic.selection();
-              switchMockUser("student");
-            }}
-          >
-            Студент
-          </Button>
-          <Button
-            size="sm"
-            variant={user?.role === "curator" ? "default" : "subtle"}
-            onClick={() => {
-              haptic.selection();
-              switchMockUser("curator");
-            }}
-          >
-            Куратор
-          </Button>
-        </div>
-
-        {/* Custom Telegram ID for testing */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-border/20">
-          <span className="text-[11px] text-muted-foreground">
-            Или задайте свой Telegram ID для тестирования:
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              placeholder="TG ID (напр. 12345678)"
-              value={customTgIdInput}
-              onChange={(e) => setCustomTgIdInput(e.target.value)}
-              className="flex-1 bg-secondary/50 rounded-xl px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-            />
-            <Button
-              size="sm"
-              variant="subtle"
-              className="text-xs h-7"
-              onClick={async () => {
-                const id = parseInt(customTgIdInput.trim());
-                if (!id) return;
-                haptic.selection();
-                await setCustomDevUser(id, user?.name || `Пользователь ${id}`, "curator");
-                toast.success(`Установлен TG ID: ${id}`);
-                setCustomTgIdInput("");
-              }}
-            >
-              Задать
-            </Button>
-          </div>
         </div>
       </div>
     </div>

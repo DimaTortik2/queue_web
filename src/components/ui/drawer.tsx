@@ -4,9 +4,17 @@ import { cn } from "@/lib/utils";
 
 const Drawer = ({
   shouldScaleBackground = false,
+  noBodyStyles = true,
+  repositionInputs = false,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+  <DrawerPrimitive.Root
+    shouldScaleBackground={shouldScaleBackground}
+    preventScrollRestoration={false}
+    noBodyStyles={noBodyStyles}
+    repositionInputs={repositionInputs}
+    {...props}
+  />
 );
 Drawer.displayName = "Drawer";
 
@@ -20,8 +28,7 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    // Flat opacity overlay, strictly no backdrop blur
-    className={cn("fixed inset-0 z-50 bg-black/40 transition-opacity duration-200", className)}
+    className={cn("fixed inset-0 z-50 bg-black/60 [backface-visibility:hidden]", className)}
     {...props}
   />
 ));
@@ -36,31 +43,25 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-3xl bg-background shadow-2xl focus:outline-none max-w-lg mx-auto",
+        "fixed inset-x-0 bottom-0 z-50 flex h-auto flex-col rounded-t-3xl bg-card focus:outline-none max-w-lg mx-auto border-0 [backface-visibility:hidden] [transform:translate3d(0,0,0)]",
         className
       )}
       {...props}
     >
-      <div className="mx-auto mt-3 h-1 w-10 rounded-full bg-muted-foreground/20" />
+      <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-muted-foreground/30 shrink-0" />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
 ));
 DrawerContent.displayName = "DrawerContent";
 
-const DrawerHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("grid gap-1 px-5 pt-4 pb-2 text-left", className)} {...props} />
+const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("grid gap-1.5 p-4 text-center sm:text-left", className)} {...props} />
 );
 DrawerHeader.displayName = "DrawerHeader";
 
-const DrawerFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("mt-auto flex flex-col gap-2 p-5 pt-2 pb-safe", className)} {...props} />
+const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("mt-auto flex flex-col gap-2 p-4 pb-safe", className)} {...props} />
 );
 DrawerFooter.displayName = "DrawerFooter";
 
@@ -70,7 +71,7 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn("text-base font-semibold text-foreground tracking-tight", className)}
+    className={cn("text-base font-semibold leading-none tracking-tight", className)}
     {...props}
   />
 ));

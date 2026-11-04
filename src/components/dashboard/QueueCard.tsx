@@ -1,10 +1,11 @@
 import React from "react";
-import { Star } from "@phosphor-icons/react";
+import { Star, LockSimple } from "@phosphor-icons/react";
 import { QueueMetaInfo } from "@/types";
 import { Badge } from "@/components/ui/badge";
 
 interface QueueCardProps {
   queue: QueueMetaInfo;
+  isCreator?: boolean;
   myPosition?: number | null;
   isPinned?: boolean;
   onTogglePin?: (e: React.MouseEvent) => void;
@@ -13,61 +14,83 @@ interface QueueCardProps {
 
 export function QueueCard({
   queue,
+  isCreator,
   myPosition,
   isPinned = false,
   onTogglePin,
   onClick,
 }: QueueCardProps) {
-  const occupancyPercent = Math.round((queue.taken_positions / queue.total_positions) * 100);
+  const occupancyPercent = queue.total_positions > 0
+    ? Math.round((queue.taken_positions / queue.total_positions) * 100)
+    : 0;
 
   return (
     <div
       onClick={onClick}
-      className="bg-secondary/30 hover:bg-secondary/50 active:scale-[0.99] rounded-2xl p-4 flex flex-col gap-3 transition-all duration-150 cursor-pointer select-none"
+      className="group relative bg-card hover:bg-secondary/60 active:scale-[0.99] rounded-2xl p-5 flex flex-col gap-4 transition-all duration-150 cursor-pointer select-none"
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-2">
+      {/* Top Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
           {onTogglePin && (
             <button
               onClick={onTogglePin}
-              className={`p-0.5 mt-0.5 transition-colors ${
-                isPinned ? "text-amber-500" : "text-muted-foreground/40 hover:text-muted-foreground"
+              className={`p-1 -ml-1 mt-0.5 rounded-lg transition-colors ${
+                isPinned
+                  ? "text-amber-500"
+                  : "text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted"
               }`}
-              title={isPinned ? "Открепить" : "Закрепить в начале"}
-              aria-label={isPinned ? "Открепить очередь" : "Закрепить очередь"}
+              title={isPinned ? "Открепить" : "Закрепить"}
+              aria-label={isPinned ? "Открепить" : "Закрепить"}
             >
-              <Star size={15} weight={isPinned ? "fill" : "regular"} />
+              <Star size={18} weight={isPinned ? "fill" : "regular"} />
             </button>
           )}
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">{queue.subject_name}</span>
-            <span className="text-sm font-semibold tracking-tight">{queue.queue_type}</span>
+
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
+              {queue.subject_name}
+            </span>
+            <h3 className="text-base font-semibold text-foreground tracking-tight truncate mt-0.5">
+              {queue.queue_type}
+            </h3>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isCreator && (
+            <Badge variant="subtle">
+              Создатель
+            </Badge>
+          )}
           {queue.is_paused ? (
-            <Badge variant="warning">Пауза</Badge>
+            <Badge variant="warning" className="flex items-center gap-1">
+              <LockSimple size={12} weight="bold" />
+              Пауза
+            </Badge>
           ) : myPosition ? (
-            <Badge variant="default">Вы #{myPosition}</Badge>
+            <Badge variant="default">Место {myPosition}</Badge>
           ) : (
-            <Badge variant="subtle">Открыта</Badge>
+            <Badge variant="success">
+              Свободно {queue.total_positions - queue.taken_positions} мест
+            </Badge>
           )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="h-1.5 w-full bg-secondary/80 rounded-full overflow-hidden">
+      {/* Progress & Occupancy Info without raw percentage */}
+      <div className="flex flex-col gap-2">
+        <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
           <div
-            className="h-full bg-primary/70 rounded-full transition-all duration-300"
+            className="h-full bg-primary rounded-full transition-all duration-300 ease-out"
             style={{ width: `${occupancyPercent}%` }}
           />
         </div>
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
           <span>
-            Занято {queue.taken_positions} из {queue.total_positions}
+            Занято {queue.taken_positions} из {queue.total_positions} мест
           </span>
-          <span>{occupancyPercent}%</span>
         </div>
       </div>
     </div>

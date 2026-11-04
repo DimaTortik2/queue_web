@@ -13,6 +13,7 @@ declare global {
         };
         version: string;
         platform: string;
+        isVersionAtLeast?: (version: string) => boolean;
         colorScheme: "light" | "dark";
         themeParams: {
           bg_color?: string;
@@ -81,7 +82,11 @@ export function initTelegramApp() {
   try {
     app.ready();
     app.expand();
-    if (typeof app.disableVerticalSwipes === "function") {
+    if (
+      typeof app.isVersionAtLeast === "function" &&
+      app.isVersionAtLeast("7.7") &&
+      typeof app.disableVerticalSwipes === "function"
+    ) {
       app.disableVerticalSwipes();
     }
     syncTelegramTheme();
@@ -92,6 +97,22 @@ export function initTelegramApp() {
 }
 
 export function syncTelegramTheme() {
+  try {
+    const raw = localStorage.getItem("queue_preferences_storage");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const userTheme = parsed?.state?.theme;
+      if (userTheme === "dark") {
+        document.documentElement.classList.add("dark");
+        return;
+      }
+      if (userTheme === "light") {
+        document.documentElement.classList.remove("dark");
+        return;
+      }
+    }
+  } catch {}
+
   const app = tg();
   const isDark =
     app?.colorScheme === "dark" ||

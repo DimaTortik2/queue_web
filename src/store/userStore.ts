@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { UserResponse, Role } from "@/types";
+import { UserResponse } from "@/types";
 import { getTelegramUser } from "@/lib/telegram";
 import { api } from "@/services/api";
 
@@ -9,25 +9,16 @@ interface UserState {
   error: string | null;
   initUser: () => Promise<void>;
   setUser: (user: UserResponse | null) => void;
-  setRole: (role: Role) => Promise<void>;
-  switchMockUser: (type: "student" | "curator") => Promise<void>;
-  setCustomDevUser: (tgId: number, name: string, role?: Role) => Promise<void>;
+  updateUserName: (name: string) => Promise<void>;
 }
 
-const MOCK_STUDENT: UserResponse = {
+// Default development fallback user
+const DEV_USER: UserResponse = {
   id: 1,
-  name: "Алексей Смирнов",
+  name: "Пользователь",
   tg_id: 100001,
   photo_url: null,
   role: "student",
-};
-
-const MOCK_CURATOR: UserResponse = {
-  id: 2,
-  name: "Преподаватель Иванов",
-  tg_id: 100002,
-  photo_url: null,
-  role: "curator",
 };
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -42,28 +33,27 @@ export const useUserStore = create<UserState>((set, get) => ({
 
       if (tgUser) {
         const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ");
-        await api.upsertUser({
+        const userData = {
           name: fullName || `User ${tgUser.id}`,
           tg_id: tgUser.id,
           photo_url: tgUser.photo_url || null,
-          role: "student",
-        });
-
+          role: "student" as const,
+        };
+        await api.upsertUser(userData);
         const remoteUser = await api.getUserByTgId(tgUser.id);
         set({ user: remoteUser, isLoading: false });
       } else {
-        // Fallback for desktop dev browser: auto-register mock user on backend
+        // Fallback for desktop dev browser: auto-register standard dev user
         try {
-          await api.upsertUser(MOCK_CURATOR);
-          const remoteUser = await api.getUserByTgId(MOCK_CURATOR.tg_id);
+          await api.upsertUser(DEV_USER);
+          const remoteUser = await api.getUserByTgId(DEV_USER.tg_id);
           set({ user: remoteUser, isLoading: false });
         } catch {
-          set({ user: MOCK_CURATOR, isLoading: false });
+          set({ user: DEV_USER, isLoading: false });
         }
       }
     } catch (err: unknown) {
       console.warn("Failed to init user via backend:", err);
-      // Fallback in case backend is offline during frontend design
       const tgUser = getTelegramUser();
       if (tgUser) {
         set({
@@ -77,48 +67,22 @@ export const useUserStore = create<UserState>((set, get) => ({
           isLoading: false,
         });
       } else {
-        set({ user: MOCK_CURATOR, isLoading: false });
+        set({ user: DEV_USER, isLoading: false });
       }
     }
   },
 
   setUser: (user) => set({ user }),
 
-  setRole: async (role: Role) => {
+  updateUserName: async (name: string) => {
     const { user } = get();
     if (!user) return;
     try {
-      const updated = await api.setUserRole(user.tg_id, { role });
+      await api.updateUser(user.tg_id, { name });
+      const updated = await api.getUserByTgId(user.tg_id);
       set({ user: updated });
     } catch {
-      set({ user: { ...user, role } });
-    }
-  },
-
-  switchMockUser: async (type: "student" | "curator") => {
-    const target = type === "student" ? MOCK_STUDENT : MOCK_CURATOR;
-    try {
-      await api.upsertUser(target);
-      const remoteUser = await api.getUserByTgId(target.tg_id);
-      set({ user: remoteUser });
-    } catch {
-      set({ user: target });
-    }
-  },
-
-  setCustomDevUser: async (tgId: number, name: string, role: Role = "curator") => {
-    const customUser = {
-      name,
-      tg_id: tgId,
-      photo_url: null,
-      role,
-    };
-    try {
-      await api.upsertUser(customUser);
-      const remoteUser = await api.getUserByTgId(tgId);
-      set({ user: remoteUser });
-    } catch {
-      set({ user: { id: tgId, ...customUser } });
+      set({ user: { ...user, name } });
     }
   },
 }));
