@@ -32,24 +32,58 @@ export const useUserStore = create<UserState>((set, get) => ({
       const tgUser = getTelegramUser();
 
       if (tgUser) {
-        const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ");
-        const userData = {
-          name: fullName || `User ${tgUser.id}`,
-          tg_id: tgUser.id,
-          photo_url: tgUser.photo_url || null,
-          role: "student" as const,
-        };
-        await api.upsertUser(userData);
-        const remoteUser = await api.getUserByTgId(tgUser.id);
+        let remoteUser: UserResponse | null = null;
+        try {
+          // 1. Проверяем, существует ли уже пользователь в базе
+          remoteUser = await api.getUserByTgId(tgUser.id);
+        } catch {
+          // Пользователь еще не создан в БД (404)
+          remoteUser = null;
+        }
+
+        if (!remoteUser) {
+          // 2. Создаем только при первой регистрации
+          const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ");
+          const userData = {
+            name: fullName || `User ${tgUser.id}`,
+            tg_id: tgUser.id,
+            photo_url: tgUser.photo_url || null,
+            role: "student" as const,
+          };
+          await api.upsertUser(userData);
+          remoteUser = await api.getUserByTgId(tgUser.id);
+        }
+
         set({ user: remoteUser, isLoading: false });
       } else {
-        // Fallback for desktop dev browser: auto-register standard dev user
-        try {
-          await api.upsertUser(DEV_USER);
-          const remoteUser = await api.getUserByTgId(DEV_USER.tg_id);
-          set({ user: remoteUser, isLoading: false });
-        } catch {
-          set({ user: DEV_USER, isLoading: false });
+        // Запуск вне Telegram (в обычном браузере)
+        const isLocalDev =
+          import.meta.env.DEV ||
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1" ||
+          new URLSearchParams(window.location.search).has("dev");
+
+        if (isLocalDev) {
+          // Локальная разработка: позволяем тестировать разработчику
+          try {
+            let remoteUser: UserResponse | null = null;
+            try {
+              remoteUser = await api.getUserByTgId(DEV_USER.tg_id);
+            } catch {
+              remoteUser = null;
+            }
+
+            if (!remoteUser) {
+              await api.upsertUser(DEV_USER);
+              remoteUser = await api.getUserByTgId(DEV_USER.tg_id);
+            }
+            set({ user: remoteUser, isLoading: false });
+          } catch {
+            set({ user: DEV_USER, isLoading: false });
+          }
+        } else {
+          // В продакшене/обычном браузере: не логинимся под фейковым юзером
+          set({ user: null, isLoading: false });
         }
       }
     } catch (err: unknown) {
@@ -67,7 +101,7 @@ export const useUserStore = create<UserState>((set, get) => ({
           isLoading: false,
         });
       } else {
-        set({ user: DEV_USER, isLoading: false });
+        set({ user: null, isLoading: false });
       }
     }
   },

@@ -12,7 +12,6 @@ import {
   Vibrate,
   ArrowsClockwise,
   Palette,
-  Users,
 } from "@phosphor-icons/react";
 import { useUserStore } from "@/store/userStore";
 import {
@@ -21,17 +20,15 @@ import {
 } from "@/store/preferencesStore";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { haptic, tg } from "@/lib/telegram";
+import { haptic } from "@/lib/telegram";
 import {
   useSubjectsList,
   useCreateSubjectMutation,
   useDeleteSubjectMutation,
-  useUsersList,
 } from "@/hooks/useQueueApi";
-import { UserResponse } from "@/types";
 
 export function ProfileView() {
-  const { user, setUser, updateUserName } = useUserStore();
+  const { user, updateUserName } = useUserStore();
   const {
     theme,
     setTheme,
@@ -49,18 +46,12 @@ export function ProfileView() {
   const [nameInput, setNameInput] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<{ id: number; name: string } | null>(null);
-  const [isSwitchUserOpen, setIsSwitchUserOpen] = useState(false);
 
   const { data: subjectsData, isLoading: isLoadingSubjects } = useSubjectsList();
-  const { data: usersData, isLoading: isLoadingUsers } = useUsersList();
   const createSubjectMutation = useCreateSubjectMutation();
   const deleteSubjectMutation = useDeleteSubjectMutation();
 
   const subjects = subjectsData?.subject_list || [];
-  const allUsers = usersData?.users || [];
-
-  // Security check: only allow switching user in local dev browser (no real Telegram Mini App context)
-  const isDevBrowserMode = !tg()?.initData;
 
   const handleStartEditName = () => {
     haptic.selection();
@@ -104,13 +95,6 @@ export function ProfileView() {
         toast.info("Предмет удален из каталога");
       },
     });
-  };
-
-  const handleSelectUser = (u: UserResponse) => {
-    haptic.selection();
-    setUser(u);
-    setIsSwitchUserOpen(false);
-    toast.success(`Переключено на: ${u.name}`);
   };
 
   return (
@@ -177,61 +161,8 @@ export function ProfileView() {
                 <PencilSimple size={18} />
               </button>
             )}
-            {/* Switch user ONLY visible in desktop dev browser, NEVER in Telegram production */}
-            {isDevBrowserMode && (
-              <button
-                onClick={() => setIsSwitchUserOpen(!isSwitchUserOpen)}
-                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all"
-                title="Сменить тестового пользователя (только в браузере)"
-              >
-                <Users size={18} />
-              </button>
-            )}
           </div>
         </div>
-
-        {/* Switch Account Box - Only visible in Dev browser */}
-        {isDevBrowserMode && isSwitchUserOpen && (
-          <div className="bg-secondary/70 rounded-2xl p-3 flex flex-col gap-2 animate-in fade-in duration-150">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground">
-                Тестовые аккаунты (dev-режим):
-              </span>
-              <button
-                onClick={() => setIsSwitchUserOpen(false)}
-                className="text-muted-foreground hover:text-foreground p-1"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto no-scrollbar">
-              {isLoadingUsers ? (
-                <Skeleton className="h-8 w-full rounded-xl" />
-              ) : allUsers.length > 0 ? (
-                allUsers.map((u) => {
-                  const isCurrent = u.tg_id === user?.tg_id;
-                  return (
-                    <button
-                      key={u.id}
-                      onClick={() => handleSelectUser(u)}
-                      className={`flex items-center justify-between p-2 rounded-xl text-xs font-medium text-left transition-all ${
-                        isCurrent
-                          ? "bg-foreground text-background font-semibold"
-                          : "hover:bg-secondary text-foreground"
-                      }`}
-                    >
-                      <span className="truncate">{u.name}</span>
-                      {isCurrent && <span className="text-[10px] opacity-75">Текущий</span>}
-                    </button>
-                  );
-                })
-              ) : (
-                <span className="text-xs text-muted-foreground">Пользователи не найдены</span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Theme Selection */}
