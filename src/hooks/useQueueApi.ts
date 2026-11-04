@@ -11,6 +11,7 @@ import {
   ClearQueueDto,
   SwapRequestCreateDto,
   SwapRequestRespondDto,
+  SwapRequestListResponse,
   SetRoleDto,
 } from "@/types";
 
@@ -229,16 +230,34 @@ export function useAcceptSwapMutation() {
       subject: string;
       data: SwapRequestRespondDto;
     }) => api.acceptSwapRequest(requestId, data),
+    onMutate: async ({ requestId }) => {
+      // Optimistically remove from all swap caches
+      queryClient.setQueriesData<SwapRequestListResponse>(
+        { queryKey: queueKeys.swaps },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            requests: old.requests.filter((r) => r.id !== requestId),
+            total: Math.max(0, old.total - 1),
+          };
+        }
+      );
+    },
     onSuccess: (_, { subject, data }) => {
       haptic.success();
       toast.success("Обмен местами подтвержден", { id: "swap_accepted" });
+      queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
-      queryClient.invalidateQueries({ queryKey: queueKeys.incomingSwaps(subject, data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(data.tg_id) });
     },
     onError: (err: Error) => {
       haptic.error();
       toast.error(err.message || "Ошибка подтверждения обмена", { id: "swap_err" });
+      queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
+      queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
     },
   });
 }
@@ -255,14 +274,29 @@ export function useRejectSwapMutation() {
       subject: string;
       data: SwapRequestRespondDto;
     }) => api.rejectSwapRequest(requestId, data),
-    onSuccess: (_, { subject, data }) => {
+    onMutate: async ({ requestId }) => {
+      queryClient.setQueriesData<SwapRequestListResponse>(
+        { queryKey: queueKeys.swaps },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            requests: old.requests.filter((r) => r.id !== requestId),
+            total: Math.max(0, old.total - 1),
+          };
+        }
+      );
+    },
+    onSuccess: (_, { subject }) => {
       haptic.light();
       toast.info("Запрос на обмен отклонен");
-      queryClient.invalidateQueries({ queryKey: queueKeys.incomingSwaps(subject, data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
+      queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
     },
     onError: (err: Error) => {
       haptic.error();
       toast.error(err.message || "Ошибка отклонения обмена");
+      queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
     },
   });
 }
@@ -279,14 +313,28 @@ export function useCancelSwapMutation() {
       subject: string;
       data: SwapRequestRespondDto;
     }) => api.cancelSwapRequest(requestId, data),
-    onSuccess: (_, { subject, data }) => {
+    onMutate: async ({ requestId }) => {
+      queryClient.setQueriesData<SwapRequestListResponse>(
+        { queryKey: queueKeys.swaps },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            requests: old.requests.filter((r) => r.id !== requestId),
+            total: Math.max(0, old.total - 1),
+          };
+        }
+      );
+    },
+    onSuccess: () => {
       haptic.light();
       toast.info("Запрос на обмен отозван");
-      queryClient.invalidateQueries({ queryKey: queueKeys.outgoingSwaps(subject, data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
     },
     onError: (err: Error) => {
       haptic.error();
       toast.error(err.message || "Ошибка отмены запроса");
+      queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
     },
   });
 }

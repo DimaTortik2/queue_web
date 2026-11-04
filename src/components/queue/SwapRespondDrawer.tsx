@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Check, X, ArrowRight } from "@phosphor-icons/react";
+import { ArrowsLeftRight, Check, X } from "@phosphor-icons/react";
 import {
   Drawer,
   DrawerContent,
@@ -26,7 +25,6 @@ export function SwapRespondDrawer({
   onClose,
 }: SwapRespondDrawerProps) {
   const { user } = useUserStore();
-  const [replyMessage, setReplyMessage] = useState("");
 
   const acceptMutation = useAcceptSwapMutation();
   const rejectMutation = useRejectSwapMutation();
@@ -41,12 +39,11 @@ export function SwapRespondDrawer({
         subject: request.subject,
         data: {
           tg_id: user.tg_id,
-          message: replyMessage.trim(),
+          message: "",
         },
       },
       {
         onSuccess: () => {
-          setReplyMessage("");
           onClose();
         },
       }
@@ -61,12 +58,11 @@ export function SwapRespondDrawer({
         subject: request.subject,
         data: {
           tg_id: user.tg_id,
-          message: replyMessage.trim(),
+          message: "",
         },
       },
       {
         onSuccess: () => {
-          setReplyMessage("");
           onClose();
         },
       }
@@ -80,50 +76,68 @@ export function SwapRespondDrawer({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>Предложение обмена местами</DrawerTitle>
-          <DrawerDescription>{request.subject}</DrawerDescription>
+          <DrawerDescription>
+            {request.subject.includes(':')
+              ? request.subject.replace(':', ' • ')
+              : request.subject}
+          </DrawerDescription>
         </DrawerHeader>
 
-        <div className="flex flex-col gap-4 px-5 py-2 max-h-[50vh] overflow-y-auto select-none">
+        <div className="flex flex-col gap-4 px-6 py-2 max-h-[50vh] overflow-y-auto select-none">
           {/* Exchange preview card */}
-          <div className="bg-secondary/40 rounded-2xl p-4 flex flex-col gap-2">
-            <span className="text-xs text-muted-foreground">Параметры обмена</span>
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold">
-                {request.from_name || `ID ${request.from_tg_id}`}
-              </span>
-              <div className="flex items-center gap-2 font-medium">
-                <span>#{request.from_position}</span>
-                <ArrowRight size={14} className="text-muted-foreground" />
-                <span>#{request.to_position} (Вы)</span>
+          <div className="bg-secondary/40 rounded-2xl p-4 flex flex-col gap-3">
+            <span className="text-xs text-muted-foreground font-medium">Параметры обмена</span>
+            
+            <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-3">
+              {/* Requester current position */}
+              <div className="flex flex-col items-center text-center p-3 rounded-xl bg-background/70">
+                <span className="text-xs text-muted-foreground font-medium truncate max-w-full">
+                  {request.from_name || `ID ${request.from_tg_id}`}
+                </span>
+                <span className="text-lg font-bold text-foreground mt-0.5">
+                  #{request.from_position}
+                </span>
+                <span className="text-[10px] text-muted-foreground/75 mt-0.5">
+                  Его текущее
+                </span>
+              </div>
+
+              {/* Direction / Swap icon */}
+              <div className="flex flex-col items-center justify-center text-primary shrink-0">
+                <ArrowsLeftRight size={22} weight="bold" />
+              </div>
+
+              {/* Target / My position */}
+              <div className="flex flex-col items-center text-center p-3 rounded-xl bg-primary/10">
+                <span className="text-xs text-primary font-bold">
+                  Вы
+                </span>
+                <span className="text-lg font-bold text-primary mt-0.5">
+                  #{request.to_position}
+                </span>
+                <span className="text-[10px] text-primary/75 mt-0.5">
+                  Куда хочет
+                </span>
               </div>
             </div>
 
+            <p className="text-[11px] text-center text-muted-foreground leading-relaxed pt-0.5">
+              В случае согласия вы перейдете на <b>место #{request.from_position}</b>, а {request.from_name || 'участник'} займет ваше <b>место #{request.to_position}</b>.
+            </p>
+
             {request.message && (
-              <div className="mt-1 bg-secondary/60 rounded-xl p-3 text-xs text-foreground/90 italic">
+              <div className="bg-secondary/70 rounded-xl p-3 text-xs text-foreground font-medium italic">
                 "{request.message}"
               </div>
             )}
           </div>
-
-          {/* Reply message input */}
-          <div className="flex flex-col gap-1.5 pt-1">
-            <label className="text-xs text-muted-foreground">
-              Ответное сообщение (необязательно)
-            </label>
-            <input
-              type="text"
-              placeholder="Например: договорились или не могу уступить"
-              value={replyMessage}
-              onChange={(e) => setReplyMessage(e.target.value)}
-              className="w-full bg-secondary/50 rounded-xl px-4 py-3 text-xs focus:outline-none focus:bg-secondary/70 transition-all placeholder:text-muted-foreground/50 text-foreground"
-            />
-          </div>
         </div>
 
-        <DrawerFooter>
-          <div className="grid grid-cols-2 gap-2">
+        <DrawerFooter className="px-6 pt-3 pb-12 mb-3 flex flex-col gap-2.5">
+          <div className="grid grid-cols-2 gap-2 w-full">
             <Button
               variant="default"
+              className="rounded-2xl h-12 text-xs font-semibold gap-1.5"
               onClick={handleAccept}
               disabled={isPending}
             >
@@ -132,6 +146,7 @@ export function SwapRespondDrawer({
             </Button>
             <Button
               variant="destructive"
+              className="rounded-2xl h-12 text-xs font-semibold gap-1.5"
               onClick={handleReject}
               disabled={isPending}
             >
@@ -140,7 +155,9 @@ export function SwapRespondDrawer({
             </Button>
           </div>
           <DrawerClose asChild>
-            <Button variant="ghost">Закрыть</Button>
+            <Button variant="ghost" className="rounded-2xl h-11 text-xs font-semibold">
+              Закрыть
+            </Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>

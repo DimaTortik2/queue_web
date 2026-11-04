@@ -114,12 +114,32 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setUrgentAlert({
             type: "kicked",
             subject: msg.subject,
-            message: msg.message || "Вы были удалены из очереди курирующим.",
+            message: msg.message || "Вы были удалены из очереди создателем.",
             timestamp: Date.now(),
           });
           toast.error(msg.message || "Вы были удалены из очереди", { id: "kicked" });
           if (msg.subject) {
             queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
+            queryClient.invalidateQueries({
+              queryKey: queueKeys.myPosition(msg.subject, user.tg_id),
+            });
+          }
+          queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(user.tg_id) });
+          break;
+
+        case "queue_created":
+        case "queue_deleted":
+        case "queue_paused":
+        case "queue_resumed":
+        case "queue_updated":
+        case "queue_advanced":
+        case "queue_cleared":
+        case "swap_request_accepted":
+          queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
+          queryClient.invalidateQueries({ queryKey: queueKeys.all });
+          if (msg.subject) {
+            queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
+            queryClient.invalidateQueries({ queryKey: queueKeys.stats(msg.subject) });
             queryClient.invalidateQueries({
               queryKey: queueKeys.myPosition(msg.subject, user.tg_id),
             });
@@ -146,17 +166,19 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.stats(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.history(subject) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
 
       if (user?.tg_id) {
         queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, user.tg_id) });
         queryClient.invalidateQueries({ queryKey: queueKeys.swapCandidates(subject, user.tg_id) });
+        queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(user.tg_id) });
       }
 
       if (msg.event === "queue_deleted") {
-        toast.info("Очередь была удалена куратором");
+        toast.info("Очередь была удалена создателем", { id: "queue_deleted" });
         queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
       } else if (msg.event === "queue_cleared") {
-        toast.info("Очередь была очищена куратором");
+        toast.info("Очередь была очищена создателем", { id: "queue_cleared" });
       }
     });
 

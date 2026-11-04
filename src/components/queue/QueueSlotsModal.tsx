@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   Trash,
@@ -33,6 +33,7 @@ import {
 } from '@/hooks/useQueueApi';
 import { useRoomSubscription } from '@/providers/WebSocketProvider';
 import { DirectSwapDrawer } from '@/components/queue/DirectSwapDrawer';
+import { SlotAvatar } from '@/components/ui/SlotAvatar';
 
 interface QueueSlotsModalProps {
   subject: string | null;
@@ -71,6 +72,19 @@ export function QueueSlotsModal({
     refetch: refetchQueue,
   } = useQueueDetail(subject);
   const { data: myPosData } = useMyPosition(subject, user?.tg_id);
+
+  // Auto-close modal if queue was deleted in real-time
+  useEffect(() => {
+    if (
+      isOpen &&
+      subject &&
+      queuesData?.queues &&
+      queuesData.queues.length > 0 &&
+      !currentMeta
+    ) {
+      onClose();
+    }
+  }, [isOpen, subject, queuesData, currentMeta, onClose]);
 
   const joinMutation = useJoinQueueMutation();
   const leaveMutation = useLeaveQueueMutation();
@@ -186,6 +200,14 @@ export function QueueSlotsModal({
     setSelectedSlotForKick(null);
   };
 
+  const colonIdx = subject ? subject.indexOf(':') : -1;
+  const subjectName =
+    currentMeta?.subject_name ||
+    (subject && colonIdx !== -1 ? subject.slice(0, colonIdx).trim() : null);
+  const queueType =
+    currentMeta?.queue_type ||
+    (subject && colonIdx !== -1 ? subject.slice(colonIdx + 1).trim() : null);
+
   const slots = Array.from({ length: totalPositions }, (_, i) => {
     const pos = i + 1;
     const existing = queueData?.queue?.find((s) => s.position === pos);
@@ -197,24 +219,27 @@ export function QueueSlotsModal({
       isMe,
       name: existing?.name || null,
       tgId: existing?.tg_id || null,
+      photoUrl: isMe
+        ? user?.photo_url || existing?.photo_url || null
+        : existing?.photo_url || null,
     };
   });
 
   return (
     <>
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
-          <DrawerHeader className="px-6 pt-6 pb-2">
-            <div className="flex items-center justify-between gap-3">
-              <DrawerTitle className="text-xl font-bold tracking-tight text-foreground truncate">
-                {subject}
+        <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0 overflow-hidden w-full">
+          <DrawerHeader className="px-6 pt-6 pb-2 w-full min-w-0 max-w-full overflow-hidden !flex !flex-col">
+            <div className="flex items-center justify-between gap-3 w-full min-w-0">
+              <DrawerTitle className="text-xl font-bold tracking-tight text-foreground truncate text-left flex-1 min-w-0">
+                {subjectName || subject}
               </DrawerTitle>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                 {isCreator && <Badge variant="subtle">Создатель</Badge>}
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
                   onClick={() => {
                     if (!subject) return;
                     navigator.clipboard.writeText(subject);
@@ -228,13 +253,16 @@ export function QueueSlotsModal({
                 </Button>
               </div>
             </div>
-            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1 text-left">
-              {isCreator
-                ? 'Вы создали эту очередь. Нажмите на участника, чтобы исключить его.'
-                : myPosition
-                  ? 'Нажмите на любого участника для предложения обмена местами.'
-                  : 'Выберите свободный номер или нажмите кнопку ниже.'}
-            </DrawerDescription>
+
+            {/* Row with Queue Type subtitle and Occupancy Counter */}
+            <div className="flex items-center justify-between gap-3 mt-1.5 w-full min-w-0">
+              <span className="text-sm font-medium text-muted-foreground truncate min-w-0 flex-1 text-left">
+                {queueType || ''}
+              </span>
+              <span className="text-xs text-muted-foreground font-medium shrink-0 whitespace-nowrap ml-auto">
+                Занято {queueData?.taken_positions || 0} из {totalPositions}
+              </span>
+            </div>
           </DrawerHeader>
 
           {/* Kick Confirmation Bar */}
@@ -279,15 +307,7 @@ export function QueueSlotsModal({
                 ))}
               </div>
             ) : (
-              <>
-                <div className="flex items-center justify-between text-xs text-muted-foreground font-medium pt-1">
-                  <span>Список мест</span>
-                  <span>
-                    Занято {queueData?.taken_positions || 0} из {totalPositions}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-5 gap-2.5 pb-2">
+              <div className="grid grid-cols-5 gap-2.5 pb-2 pt-1">
                   {slots.map((slot) => {
                     let bgClass =
                       'bg-secondary text-muted-foreground hover:bg-secondary/80';
@@ -310,12 +330,26 @@ export function QueueSlotsModal({
                             slot.name,
                           )
                         }
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-2xl min-h-[58px] transition-all duration-150 tap-press active:scale-95 text-center select-none ${bgClass}`}
+                        className={`flex flex-col items-center justify-between p-2 rounded-2xl h-[66px] transition-all duration-150 tap-press active:scale-95 text-center select-none ${bgClass}`}
                       >
-                        <span className="text-sm font-bold leading-none">
+                        <span className="text-xs font-bold leading-none">
                           {slot.pos}
                         </span>
-                        <span className="text-[10px] truncate max-w-full mt-1.5 opacity-80 font-medium">
+
+                        {!slot.isFree ? (
+                          <SlotAvatar
+                            photoUrl={slot.photoUrl}
+                            name={slot.isMe ? user?.name : slot.name}
+                            isMe={slot.isMe}
+                            className={
+                              slot.isMe ? '!bg-white/20 !text-white' : ''
+                            }
+                          />
+                        ) : (
+                          <div className="w-5 h-5 shrink-0" />
+                        )}
+
+                        <span className="text-[10px] truncate max-w-full opacity-85 font-medium leading-tight">
                           {slot.isMe
                             ? 'Вы'
                             : slot.isFree
@@ -326,7 +360,6 @@ export function QueueSlotsModal({
                     );
                   })}
                 </div>
-              </>
             )}
           </div>
 

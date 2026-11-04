@@ -66,6 +66,7 @@ export interface QueueMetaInfo {
   taken_positions: number;
   total_positions: number;
   is_paused: boolean;
+  my_position?: number | null;
 }
 
 export interface QueueListResponse {
@@ -209,7 +210,15 @@ export type UserEventType =
   | "swap_cancelled"
   | "your_turn"
   | "submission_completed"
-  | "kicked";
+  | "kicked"
+  | "queue_created"
+  | "queue_deleted"
+  | "queue_paused"
+  | "queue_resumed"
+  | "queue_updated"
+  | "queue_advanced"
+  | "queue_cleared"
+  | "swap_request_accepted";
 
 export interface UserWsMessage {
   event: UserEventType;

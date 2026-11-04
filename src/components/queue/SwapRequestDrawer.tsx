@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { ArrowsLeftRight, Check } from "@phosphor-icons/react";
+import { useState, useEffect } from 'react';
+import { ArrowsLeftRight, Check } from '@phosphor-icons/react';
 import {
   Drawer,
   DrawerContent,
@@ -8,12 +8,16 @@ import {
   DrawerDescription,
   DrawerFooter,
   DrawerClose,
-} from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { haptic } from "@/lib/telegram";
-import { useUserStore } from "@/store/userStore";
-import { useSwapCandidates, useCreateSwapRequestMutation } from "@/hooks/useQueueApi";
-import { SwapCandidate } from "@/types";
+} from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import { haptic } from '@/lib/telegram';
+import { useUserStore } from '@/store/userStore';
+import {
+  useSwapCandidates,
+  useCreateSwapRequestMutation,
+} from '@/hooks/useQueueApi';
+import { SwapCandidate } from '@/types';
+import { SlotAvatar } from '@/components/ui/SlotAvatar';
 
 interface SwapRequestDrawerProps {
   subject: string | null;
@@ -31,12 +35,13 @@ export function SwapRequestDrawer({
   onClose,
 }: SwapRequestDrawerProps) {
   const { user } = useUserStore();
-  const [selectedCandidate, setSelectedCandidate] = useState<SwapCandidate | null>(null);
-  const [message, setMessage] = useState("");
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<SwapCandidate | null>(null);
+  const [message, setMessage] = useState('');
 
   const { data: candidates = [], isLoading } = useSwapCandidates(
     subject,
-    user?.tg_id
+    user?.tg_id,
   );
 
   const createSwapMutation = useCreateSwapRequestMutation();
@@ -65,10 +70,10 @@ export function SwapRequestDrawer({
       {
         onSuccess: () => {
           onClose();
-          setMessage("");
+          setMessage('');
           setSelectedCandidate(null);
         },
-      }
+      },
     );
   };
 
@@ -80,7 +85,7 @@ export function SwapRequestDrawer({
           <DrawerDescription>
             {preselectedName
               ? `Обмен с участником: ${preselectedName}`
-              : "Выберите участника перед вами и укажите сообщение."}
+              : "Выберите участника для обмена местами."}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -91,11 +96,13 @@ export function SwapRequestDrawer({
             </div>
           ) : candidates.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
-              Впереди вас пока нет участников, доступных для обмена.
+              В очереди пока нет других участников, доступных для обмена.
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <span className="text-xs text-muted-foreground">Выберите участника:</span>
+              <span className="text-xs text-muted-foreground">
+                Выберите участника:
+              </span>
               <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
                 {candidates.map((c) => {
                   const isSelected = selectedCandidate?.position === c.position;
@@ -108,16 +115,29 @@ export function SwapRequestDrawer({
                       }}
                       className={`flex items-center justify-between p-3 rounded-2xl transition-all duration-150 text-left select-none ${
                         isSelected
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "bg-secondary/40 hover:bg-secondary/70 text-foreground"
+                          ? 'bg-primary text-primary-foreground font-medium'
+                          : 'bg-secondary/40 hover:bg-secondary/70 text-foreground'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">#{c.position}</span>
-                        <span className="text-xs">{c.name}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-sm font-semibold shrink-0">
+                          #{c.position}
+                        </span>
+                        <SlotAvatar
+                          photoUrl={c.photo_url}
+                          name={c.name}
+                          size={22}
+                        />
+                        <span className="text-xs truncate">{c.name}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs opacity-80">
-                        <span>на {c.slots_difference} мест ближе</span>
+                        <span>
+                          {c.slots_difference > 0
+                            ? `на ${c.slots_difference} ближе`
+                            : c.slots_difference < 0
+                              ? `на ${Math.abs(c.slots_difference)} дальше`
+                              : 'рядом'}
+                        </span>
                         {isSelected && <Check size={14} weight="bold" />}
                       </div>
                     </button>
@@ -141,17 +161,22 @@ export function SwapRequestDrawer({
           </div>
         </div>
 
-        <DrawerFooter>
+        <DrawerFooter className="px-6 pt-3 pb-12 mb-3 flex flex-col gap-2.5">
           <Button
             variant="default"
+            className="rounded-2xl h-12 text-sm font-semibold gap-2"
             onClick={handleSubmit}
             disabled={!selectedCandidate || createSwapMutation.isPending}
           >
-            <ArrowsLeftRight size={16} />
-            {createSwapMutation.isPending ? "Отправка..." : "Отправить предложение"}
+            <ArrowsLeftRight size={18} weight="bold" />
+            {createSwapMutation.isPending
+              ? 'Отправка...'
+              : 'Отправить предложение'}
           </Button>
           <DrawerClose asChild>
-            <Button variant="ghost">Отмена</Button>
+            <Button variant="ghost" className="rounded-2xl h-11 text-xs font-semibold">
+              Отмена
+            </Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>

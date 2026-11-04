@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus } from "@phosphor-icons/react";
+import { useState } from 'react';
+import { Plus } from '@phosphor-icons/react';
 import {
   Drawer,
   DrawerContent,
@@ -8,16 +8,16 @@ import {
   DrawerDescription,
   DrawerFooter,
   DrawerClose,
-} from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { useUserStore } from "@/store/userStore";
+} from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import { useUserStore } from '@/store/userStore';
 import {
   useSubjectsList,
   useCreateSubjectMutation,
   useCreateQueueMutation,
   useJoinQueueMutation,
-} from "@/hooks/useQueueApi";
-import { haptic } from "@/lib/telegram";
+} from '@/hooks/useQueueApi';
+import { haptic } from '@/lib/telegram';
 
 interface CreateQueueDrawerProps {
   isOpen: boolean;
@@ -31,9 +31,9 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
   const createQueueMutation = useCreateQueueMutation();
   const joinMutation = useJoinQueueMutation();
 
-  const [subjectName, setSubjectName] = useState("");
-  const [customSubject, setCustomSubject] = useState("");
-  const [queueType, setQueueType] = useState("");
+  const [subjectName, setSubjectName] = useState('');
+  const [customSubject, setCustomSubject] = useState('');
+  const [queueType, setQueueType] = useState('');
   const [maxPositions, setMaxPositions] = useState<number>(30);
   const [chosenPosition, setChosenPosition] = useState<number>(1);
   const [joinImmediately, setJoinImmediately] = useState<boolean>(true);
@@ -41,20 +41,22 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
   const subjects = subjectsData?.subject_list || [];
 
   const handleCreate = async () => {
-    const finalSubject = (subjectName === "custom" ? customSubject : subjectName).trim();
+    const finalSubject = (
+      subjectName === 'custom' ? customSubject : subjectName
+    ).trim();
     const finalType = queueType.trim();
 
     if (!finalSubject || !finalType || !user?.tg_id) return;
 
     // Auto-register custom subject in catalog if it doesn't exist yet
     const alreadyExists = subjects.some(
-      (s) => s.name.toLowerCase() === finalSubject.toLowerCase()
+      (s) => s.name.toLowerCase() === finalSubject.toLowerCase(),
     );
     if (!alreadyExists) {
       try {
         await createSubjectMutation.mutateAsync(finalSubject);
       } catch (err) {
-        console.warn("Auto-register subject error:", err);
+        console.warn('Auto-register subject error:', err);
       }
     }
 
@@ -67,7 +69,11 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
       {
         onSuccess: () => {
           const fullSubjectKey = `${finalSubject}:${finalType}`;
-          if (joinImmediately && chosenPosition >= 1 && chosenPosition <= maxPositions) {
+          if (
+            joinImmediately &&
+            chosenPosition >= 1 &&
+            chosenPosition <= maxPositions
+          ) {
             joinMutation.mutate({
               subject: fullSubjectKey,
               data: {
@@ -77,19 +83,19 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             });
           }
           onClose();
-          setSubjectName("");
-          setCustomSubject("");
-          setQueueType("");
+          setSubjectName('');
+          setCustomSubject('');
+          setQueueType('');
           setMaxPositions(30);
           setChosenPosition(1);
         },
-      }
+      },
     );
   };
 
   const isFormValid = Boolean(
-    (subjectName === "custom" ? customSubject.trim() : subjectName.trim()) &&
-      queueType.trim()
+    (subjectName === 'custom' ? customSubject.trim() : subjectName.trim()) &&
+    queueType.trim(),
   );
 
   return (
@@ -124,8 +130,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                     }}
                     className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                       isSelected
-                        ? "bg-foreground text-background"
-                        : "bg-secondary text-foreground hover:bg-secondary/80"
+                        ? 'bg-foreground text-background'
+                        : 'bg-secondary text-foreground hover:bg-secondary/80'
                     }`}
                   >
                     {s.name}
@@ -137,12 +143,12 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                 type="button"
                 onClick={() => {
                   haptic.selection();
-                  setSubjectName("custom");
+                  setSubjectName('custom');
                 }}
                 className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  subjectName === "custom"
-                    ? "bg-foreground text-background"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                  subjectName === 'custom'
+                    ? 'bg-foreground text-background'
+                    : 'bg-secondary text-muted-foreground hover:text-foreground'
                 }`}
               >
                 + Свой предмет
@@ -151,7 +157,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
           </div>
 
           {/* Custom Subject Name input if chosen */}
-          {subjectName === "custom" && (
+          {subjectName === 'custom' && (
             <div className="flex flex-col gap-1.5 animate-in fade-in duration-150">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Название предмета
@@ -174,7 +180,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             </label>
             <input
               type="text"
-              placeholder="Например: Лабораторная 1, Коллоквиум"
+              placeholder="Лабораторная 1..."
               value={queueType}
               onChange={(e) => setQueueType(e.target.value)}
               className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-medium focus:bg-card focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground/50 border-0 outline-none"
@@ -201,8 +207,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                       }}
                       className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start min-w-[85px] transition-all ${
                         isSelected
-                          ? "bg-foreground text-background"
-                          : "bg-secondary text-foreground hover:bg-secondary/80"
+                          ? 'bg-foreground text-background'
+                          : 'bg-secondary text-foreground hover:bg-secondary/80'
                       }`}
                     >
                       {count} мест
@@ -225,7 +231,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                 onClick={() => setJoinImmediately(!joinImmediately)}
                 className="text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                {joinImmediately ? "Встать в очередь" : "Не занимать место"}
+                {joinImmediately ? 'Встать в очередь' : 'Не занимать место'}
               </button>
             </div>
 
@@ -233,26 +239,28 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
               <div className="flex flex-col gap-1.5">
                 <div className="w-full overflow-hidden">
                   <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth snap-x snap-mandatory">
-                    {Array.from({ length: maxPositions }, (_, i) => i + 1).map((pos) => {
-                      const isSelected = chosenPosition === pos;
-                      return (
-                        <button
-                          key={pos}
-                          type="button"
-                          onClick={() => {
-                            haptic.selection();
-                            setChosenPosition(pos);
-                          }}
-                          className={`w-12 h-12 rounded-xl text-xs font-semibold flex items-center justify-center shrink-0 snap-start transition-all ${
-                            isSelected
-                              ? "bg-foreground text-background scale-105"
-                              : "bg-secondary text-foreground hover:bg-secondary/80"
-                          }`}
-                        >
-                          #{pos}
-                        </button>
-                      );
-                    })}
+                    {Array.from({ length: maxPositions }, (_, i) => i + 1).map(
+                      (pos) => {
+                        const isSelected = chosenPosition === pos;
+                        return (
+                          <button
+                            key={pos}
+                            type="button"
+                            onClick={() => {
+                              haptic.selection();
+                              setChosenPosition(pos);
+                            }}
+                            className={`w-12 h-12 rounded-xl text-xs font-semibold flex items-center justify-center shrink-0 snap-start transition-all ${
+                              isSelected
+                                ? 'bg-foreground text-background scale-105'
+                                : 'bg-secondary text-foreground hover:bg-secondary/80'
+                            }`}
+                          >
+                            #{pos}
+                          </button>
+                        );
+                      },
+                    )}
                     <div className="shrink-0 w-4" />
                   </div>
                 </div>
@@ -272,17 +280,17 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             disabled={createQueueMutation.isPending || !isFormValid}
             disabledReason={
               !subjectName
-                ? "Сначала выберите предмет"
-                : subjectName === "custom" && !customSubject.trim()
-                ? "Введите название предмета"
-                : !queueType.trim()
-                ? "Введите тип сдачи (например: Лабораторная 1)"
-                : undefined
+                ? 'Сначала выберите предмет'
+                : subjectName === 'custom' && !customSubject.trim()
+                  ? 'Введите название предмета'
+                  : !queueType.trim()
+                    ? 'Введите тип сдачи (например: Лабораторная 1)'
+                    : undefined
             }
             className="w-full rounded-2xl h-12 text-sm font-semibold gap-1.5"
           >
             {createQueueMutation.isPending ? (
-              "Создание..."
+              'Создание...'
             ) : (
               <>
                 <Plus size={18} weight="bold" />
@@ -291,7 +299,10 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             )}
           </Button>
           <DrawerClose asChild>
-            <Button variant="secondary" className="w-full rounded-2xl h-12 text-sm font-medium">
+            <Button
+              variant="secondary"
+              className="w-full rounded-2xl h-12 text-sm font-medium"
+            >
               Отмена
             </Button>
           </DrawerClose>

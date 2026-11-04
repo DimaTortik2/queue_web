@@ -53,8 +53,15 @@ export function DashboardView() {
   const allQueues = queuesData?.queues || [];
   const userQueues = userQueuesData?.queues || [];
   const subjects = subjectsData?.subject_list || [];
-  const userQueueSubjects = useMemo(() => {
-    return new Set(userQueues.map((q) => q.subject));
+
+  const userPositionsMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const q of userQueues) {
+      if (q.my_position !== undefined && q.my_position !== null) {
+        map.set(q.subject, q.my_position);
+      }
+    }
+    return map;
   }, [userQueues]);
 
   // Sort: pinned first, then by creator/active
@@ -197,7 +204,7 @@ export function DashboardView() {
           </div>
         ) : displayedQueues.length > 0 ? (
           displayedQueues.map((q) => {
-            const isEnrolled = userQueueSubjects.has(q.subject);
+            const myPos = userPositionsMap.get(q.subject) ?? (q.my_position ?? null);
             const isCreator = user?.tg_id
               ? q.created_by_tg_id === user.tg_id
               : false;
@@ -206,7 +213,7 @@ export function DashboardView() {
                 key={q.subject}
                 queue={q}
                 isCreator={isCreator}
-                myPosition={isEnrolled ? 1 : null}
+                myPosition={myPos}
                 isPinned={isPinned(q.subject)}
                 onTogglePin={(e) => {
                   e.stopPropagation();

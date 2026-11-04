@@ -12,13 +12,29 @@ interface UserState {
   updateUserName: (name: string) => Promise<void>;
 }
 
-// Default development fallback user
-const DEV_USER: UserResponse = {
-  id: 1,
-  name: "Пользователь",
-  tg_id: 100001,
-  photo_url: null,
-  role: "student",
+// Dev test users with demo avatar photos for easy local multi-user testing
+const DEV_USERS: Record<string, UserResponse> = {
+  "1": {
+    id: 1,
+    name: "Алексей Иванов",
+    tg_id: 100001,
+    photo_url: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop&crop=face",
+    role: "student",
+  },
+  "2": {
+    id: 2,
+    name: "Дарья Смирнова",
+    tg_id: 100002,
+    photo_url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=face",
+    role: "student",
+  },
+  "3": {
+    id: 3,
+    name: "Максим Ковалев",
+    tg_id: 100003,
+    photo_url: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&h=120&fit=crop&crop=face",
+    role: "student",
+  },
 };
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -57,29 +73,47 @@ export const useUserStore = create<UserState>((set, get) => ({
         set({ user: remoteUser, isLoading: false });
       } else {
         // Запуск вне Telegram (в обычном браузере)
+        const urlParams = new URLSearchParams(window.location.search);
         const isLocalDev =
           import.meta.env.DEV ||
           window.location.hostname === "localhost" ||
           window.location.hostname === "127.0.0.1" ||
-          new URLSearchParams(window.location.search).has("dev");
+          urlParams.has("dev") ||
+          urlParams.has("user");
 
         if (isLocalDev) {
-          // Локальная разработка: позволяем тестировать разработчику
+          // Локальная разработка: поддержка нескольких тестовых пользователей для обмена
+          const userKey = urlParams.get("user") || urlParams.get("dev") || "1";
+          const devUser = DEV_USERS[userKey] || {
+            id: Number(userKey) || 1,
+            name: `Тестер ${userKey}`,
+            tg_id: 100000 + (Number(userKey) || 1),
+            photo_url: DEV_USERS["1"].photo_url,
+            role: "student" as const,
+          };
+
           try {
             let remoteUser: UserResponse | null = null;
             try {
-              remoteUser = await api.getUserByTgId(DEV_USER.tg_id);
+              remoteUser = await api.getUserByTgId(devUser.tg_id);
             } catch {
               remoteUser = null;
             }
 
             if (!remoteUser) {
-              await api.upsertUser(DEV_USER);
-              remoteUser = await api.getUserByTgId(DEV_USER.tg_id);
+              await api.upsertUser(devUser);
+              remoteUser = await api.getUserByTgId(devUser.tg_id);
+            } else if (!remoteUser.photo_url && devUser.photo_url) {
+              // Если у тестового юзера в базе еще нет фото — обновим его для теста
+              await api.updateUser(devUser.tg_id, {
+                photo_url: devUser.photo_url,
+                name: remoteUser.name === "Пользователь" ? devUser.name : remoteUser.name,
+              });
+              remoteUser = await api.getUserByTgId(devUser.tg_id);
             }
             set({ user: remoteUser, isLoading: false });
           } catch {
-            set({ user: DEV_USER, isLoading: false });
+            set({ user: devUser, isLoading: false });
           }
         } else {
           // В продакшене/обычном браузере: не логинимся под фейковым юзером
