@@ -47,22 +47,47 @@
   * {
     -webkit-tap-highlight-color: transparent;
     outline-color: hsl(var(--ring));
+    /* Hide all scrollbars globally (Chrome, Safari, Firefox, Edge) */
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
 
-  html {
-    overflow-y: scroll;
-    scrollbar-gutter: stable;
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  html,
+  body {
     overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    overflow-x: hidden;
     min-height: 100vh;
     min-height: 100dvh;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  /* Completely eliminate any layout shift / jumps from Radix Dialog, react-remove-scroll or Vaul */
+  body[data-scroll-locked],
+  html[data-scroll-locked] {
+    margin-right: 0px !important;
+    padding-right: 0px !important;
+    --removed-body-scroll-bar-size: 0px !important;
   }
 }
 
@@ -74,7 +99,7 @@
   padding-top: env(safe-area-inset-top, 16px);
 }
 
-/* Prevent Vaul Drawer flicker & layout shifts */
+/* Smooth Drawer transitions without flickering */
 [data-vaul-overlay] {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -83,5 +108,4 @@
 [data-vaul-drawer] {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  transform: translate3d(0, 0, 0);
 }

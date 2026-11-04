@@ -13,49 +13,42 @@ export function QueueLogo({ className = "w-10 h-10", size = 40 }: QueueLogoProps
       xmlns="http://www.w3.org/2000/svg"
       className={`shrink-0 ${className}`}
     >
-      {/* Upper line */}
-      <line
-        x1="264"
-        y1="219"
-        x2="313"
-        y2="255"
-        stroke="#e8e8e8"
-        strokeWidth="16"
+      {/* Lower connecting line */}
+      <path
+        opacity="0.5"
+        d="M295.784 354.244L274.017 370.219"
+        strokeWidth="13.8365"
         strokeLinecap="round"
-        className="stroke-neutral-300/60 dark:stroke-neutral-700/60"
+        className="stroke-neutral-800/40 dark:stroke-neutral-600/50"
       />
-      {/* Lower line */}
-      <line
-        x1="313"
-        y1="345"
-        x2="276"
-        y2="370"
-        stroke="#e8e8e8"
-        strokeWidth="14"
+      {/* Upper connecting line */}
+      <path
+        opacity="0.5"
+        d="M283.974 231.101L263.849 215.886"
+        strokeWidth="19.6017"
         strokeLinecap="round"
-        className="stroke-neutral-300/60 dark:stroke-neutral-700/60"
+        className="stroke-neutral-800/40 dark:stroke-neutral-600/50"
       />
-      {/* Top circle */}
-      <circle
-        cx="190"
-        cy="168"
-        r="81"
-        fill="#e8e8e8"
-        className="fill-neutral-200 dark:fill-neutral-800"
+      {/* Mid-right ellipse */}
+      <ellipse
+        cx="374.895"
+        cy="287.269"
+        rx="84.1055"
+        ry="83.4217"
+        className="fill-neutral-800 dark:fill-neutral-700"
       />
-      {/* Mid circle */}
+      {/* Top-left circle */}
       <circle
-        cx="372"
-        cy="297"
-        r="61"
-        fill="#e8e8e8"
-        className="fill-neutral-200 dark:fill-neutral-800"
+        cx="169.841"
+        cy="146.841"
+        r="91.8407"
+        className="fill-neutral-800 dark:fill-neutral-700"
       />
-      {/* Bottom accent circle - adapts to active primary color */}
+      {/* Bottom accent circle - adapts to active primary accent color */}
       <circle
-        cx="232.5"
-        cy="389.5"
-        r="35.5"
+        cx="214.234"
+        cy="407.168"
+        r="49.2325"
         fill="hsl(var(--primary))"
       />
     </svg>

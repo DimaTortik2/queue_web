@@ -35,7 +35,7 @@ export function SwapRequestDrawer({
   const [message, setMessage] = useState("");
 
   const { data: candidates = [], isLoading } = useSwapCandidates(
-    isOpen ? subject : null,
+    subject,
     user?.tg_id
   );
 

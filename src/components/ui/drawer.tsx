@@ -6,6 +6,7 @@ const Drawer = ({
   shouldScaleBackground = false,
   noBodyStyles = true,
   repositionInputs = false,
+  disablePreventScroll = false,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root
@@ -13,6 +14,7 @@ const Drawer = ({
     preventScrollRestoration={false}
     noBodyStyles={noBodyStyles}
     repositionInputs={repositionInputs}
+    disablePreventScroll={disablePreventScroll}
     {...props}
   />
 );
@@ -43,7 +45,7 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 flex h-auto flex-col rounded-t-3xl bg-card focus:outline-none max-w-lg mx-auto border-0 [backface-visibility:hidden] [transform:translate3d(0,0,0)]",
+        "fixed inset-x-0 bottom-0 z-50 flex h-auto flex-col rounded-t-3xl bg-card focus:outline-none max-w-lg mx-auto border-0 [backface-visibility:hidden]",
         className
       )}
       {...props}

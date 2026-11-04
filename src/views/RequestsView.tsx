@@ -141,33 +141,36 @@ export function RequestsView() {
         </p>
       </header>
 
-      {/* Queue selector pills: showing both subject and queue_type clearly */}
+      {/* Queue selector carousel strictly within content bounds with edge peek affordance */}
       {uniqueUserQueues.length > 1 ? (
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 py-0.5">
-          {uniqueUserQueues.map((q) => {
-            const isSelected = currentSubject === q.subject;
-            return (
-              <button
-                key={q.subject}
-                onClick={() => {
-                  haptic.selection();
-                  setSelectedSubject(q.subject);
-                }}
-                className={`flex flex-col text-left px-4 py-2.5 rounded-2xl text-xs transition-all duration-150 ${
-                  isSelected
-                    ? "bg-foreground text-background"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="font-semibold truncate max-w-[150px]">
-                  {q.queue_type || q.subject}
-                </span>
-                <span className="text-[10px] opacity-75 truncate max-w-[150px]">
-                  {q.subject_name}
-                </span>
-              </button>
-            );
-          })}
+        <div className="w-full overflow-hidden">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
+            {uniqueUserQueues.map((q) => {
+              const isSelected = currentSubject === q.subject;
+              return (
+                <button
+                  key={q.subject}
+                  onClick={() => {
+                    haptic.selection();
+                    setSelectedSubject(q.subject);
+                  }}
+                  className={`flex flex-col text-left px-4 py-3 rounded-2xl text-xs transition-all duration-150 shrink-0 snap-start min-w-[130px] max-w-[155px] ${
+                    isSelected
+                      ? "bg-foreground text-background shadow-sm"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="font-semibold truncate">
+                    {q.queue_type || q.subject}
+                  </span>
+                  <span className="text-[10px] opacity-75 truncate mt-0.5">
+                    {q.subject_name}
+                  </span>
+                </button>
+              );
+            })}
+            <div className="shrink-0 w-4" />
+          </div>
         </div>
       ) : !currentSubject ? (
         <div className="bg-card rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2">

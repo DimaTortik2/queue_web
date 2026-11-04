@@ -186,32 +186,35 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Всего мест в очереди ({maxPositions})
             </label>
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
-              {[10, 15, 20, 25, 30].map((count) => {
-                const isSelected = maxPositions === count;
-                return (
-                  <button
-                    key={count}
-                    type="button"
-                    onClick={() => {
-                      haptic.selection();
-                      setMaxPositions(count);
-                      if (chosenPosition > count) setChosenPosition(count);
-                    }}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                      isSelected
-                        ? "bg-foreground text-background"
-                        : "bg-secondary text-foreground hover:bg-secondary/80"
-                    }`}
-                  >
-                    {count} мест
-                  </button>
-                );
-              })}
+            <div className="w-full overflow-hidden">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
+                {[10, 15, 20, 25, 30].map((count) => {
+                  const isSelected = maxPositions === count;
+                  return (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setMaxPositions(count);
+                        if (chosenPosition > count) setChosenPosition(count);
+                      }}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start min-w-[85px] transition-all ${
+                        isSelected
+                          ? "bg-foreground text-background"
+                          : "bg-secondary text-foreground hover:bg-secondary/80"
+                      }`}
+                    >
+                      {count} мест
+                    </button>
+                  );
+                })}
+                <div className="shrink-0 w-4" />
+              </div>
             </div>
           </div>
 
-          {/* Creator Slot Selection - Smooth Horizontal Carousel */}
+          {/* Creator Slot Selection - Smooth Horizontal Carousel strictly within bounds */}
           <div className="flex flex-col gap-2 pt-1">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -228,27 +231,30 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
 
             {joinImmediately && (
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-                  {Array.from({ length: maxPositions }, (_, i) => i + 1).map((pos) => {
-                    const isSelected = chosenPosition === pos;
-                    return (
-                      <button
-                        key={pos}
-                        type="button"
-                        onClick={() => {
-                          haptic.selection();
-                          setChosenPosition(pos);
-                        }}
-                        className={`min-w-[44px] h-11 px-3 rounded-xl text-xs font-semibold flex items-center justify-center shrink-0 transition-all ${
-                          isSelected
-                            ? "bg-foreground text-background scale-105"
-                            : "bg-secondary text-foreground hover:bg-secondary/80"
-                        }`}
-                      >
-                        #{pos}
-                      </button>
-                    );
-                  })}
+                <div className="w-full overflow-hidden">
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth snap-x snap-mandatory">
+                    {Array.from({ length: maxPositions }, (_, i) => i + 1).map((pos) => {
+                      const isSelected = chosenPosition === pos;
+                      return (
+                        <button
+                          key={pos}
+                          type="button"
+                          onClick={() => {
+                            haptic.selection();
+                            setChosenPosition(pos);
+                          }}
+                          className={`w-12 h-12 rounded-xl text-xs font-semibold flex items-center justify-center shrink-0 snap-start transition-all ${
+                            isSelected
+                              ? "bg-foreground text-background scale-105"
+                              : "bg-secondary text-foreground hover:bg-secondary/80"
+                          }`}
+                        >
+                          #{pos}
+                        </button>
+                      );
+                    })}
+                    <div className="shrink-0 w-4" />
+                  </div>
                 </div>
                 <span className="text-[11px] text-muted-foreground">
                   Выбрано место #{chosenPosition}

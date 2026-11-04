@@ -69,8 +69,8 @@ export function QueueSlotsModal({
     isLoading,
     isError: isErrorQueue,
     refetch: refetchQueue,
-  } = useQueueDetail(isOpen ? subject : null);
-  const { data: myPosData } = useMyPosition(isOpen ? subject : null, user?.tg_id);
+  } = useQueueDetail(subject);
+  const { data: myPosData } = useMyPosition(subject, user?.tg_id);
 
   const joinMutation = useJoinQueueMutation();
   const leaveMutation = useLeaveQueueMutation();
@@ -257,7 +257,7 @@ export function QueueSlotsModal({
           )}
 
           {/* Slots Container */}
-          <div className="flex flex-col gap-4 px-6 py-2 max-h-[50vh] overflow-y-auto no-scrollbar">
+          <div className="flex flex-col gap-4 px-6 py-2 max-h-[50vh] min-h-[260px] overflow-y-auto no-scrollbar">
             {isErrorQueue ? (
               <RetryBanner
                 message="Ошибка загрузки слотов"

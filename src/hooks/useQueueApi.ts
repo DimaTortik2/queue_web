@@ -74,6 +74,8 @@ export function useQueueDetail(subject: string | null) {
     queryKey: queueKeys.detail(subject || ""),
     queryFn: () => (subject ? api.getQueue(subject) : Promise.reject("No subject")),
     enabled: !!subject,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -85,6 +87,8 @@ export function useMyPosition(subject: string | null, tgId: number | undefined) 
         ? api.getMyPosition(subject, tgId)
         : Promise.reject("Missing subject or tgId"),
     enabled: !!subject && !!tgId,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -96,6 +100,8 @@ export function useSwapCandidates(subject: string | null, tgId: number | undefin
         ? api.getSwapCandidates(subject, tgId)
         : Promise.resolve([]),
     enabled: !!subject && !!tgId,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -104,6 +110,8 @@ export function useQueueStats(subject: string | null) {
     queryKey: queueKeys.stats(subject || ""),
     queryFn: () => (subject ? api.getQueueStats(subject) : Promise.reject("No subject")),
     enabled: !!subject,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -112,6 +120,8 @@ export function useQueueHistory(subject: string | null) {
     queryKey: queueKeys.history(subject || ""),
     queryFn: () => (subject ? api.getQueueHistory(subject) : Promise.reject("No subject")),
     enabled: !!subject,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 

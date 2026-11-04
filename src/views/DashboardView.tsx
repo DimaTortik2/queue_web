@@ -1,31 +1,35 @@
-import { useState, useMemo } from "react";
-import { Plus, MagnifyingGlass } from "@phosphor-icons/react";
-import { useUserStore } from "@/store/userStore";
-import { usePreferencesStore } from "@/store/preferencesStore";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { RetryBanner } from "@/components/ui/retry-banner";
-import { haptic } from "@/lib/telegram";
+import { useState, useMemo } from 'react';
+import { Plus, MagnifyingGlass } from '@phosphor-icons/react';
+import { useUserStore } from '@/store/userStore';
+import { usePreferencesStore } from '@/store/preferencesStore';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RetryBanner } from '@/components/ui/retry-banner';
+import { haptic } from '@/lib/telegram';
 import {
   useQueuesList,
   useUserActiveQueues,
   useSubjectsList,
-} from "@/hooks/useQueueApi";
-import { QueueCard } from "@/components/dashboard/QueueCard";
-import { QueueSlotsModal } from "@/components/queue/QueueSlotsModal";
-import { SwapRequestDrawer } from "@/components/queue/SwapRequestDrawer";
-import { CreateQueueDrawer } from "@/components/queue/CreateQueueDrawer";
-import { QueueLogo } from "@/components/ui/QueueLogo";
+} from '@/hooks/useQueueApi';
+import { QueueCard } from '@/components/dashboard/QueueCard';
+import { QueueSlotsModal } from '@/components/queue/QueueSlotsModal';
+import { SwapRequestDrawer } from '@/components/queue/SwapRequestDrawer';
+import { CreateQueueDrawer } from '@/components/queue/CreateQueueDrawer';
+import { QueueLogo } from '@/components/ui/QueueLogo';
 
 export function DashboardView() {
   const { user } = useUserStore();
   const { togglePinSubject, isPinned } = usePreferencesStore();
 
-  const [search, setSearch] = useState("");
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<
+    string | null
+  >(null);
 
   // Modals state
-  const [selectedQueueSubject, setSelectedQueueSubject] = useState<string | null>(null);
+  const [selectedQueueSubject, setSelectedQueueSubject] = useState<
+    string | null
+  >(null);
   const [isSlotsModalOpen, setIsSlotsModalOpen] = useState(false);
   const [isSwapDrawerOpen, setIsSwapDrawerOpen] = useState(false);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
@@ -85,11 +89,8 @@ export function DashboardView() {
           <QueueLogo size={42} />
           <div className="flex flex-col">
             <h1 className="text-xl font-bold tracking-tight text-foreground">
-              {user?.name || "Гость"}
+              {user?.name || 'Гость'}
             </h1>
-            <span className="text-xs text-muted-foreground font-medium">
-              Списки и запись на сдачу
-            </span>
           </div>
         </div>
 
@@ -122,41 +123,44 @@ export function DashboardView() {
         />
       </div>
 
-      {/* Subject Filter Pills (Horizontal Scroll) */}
+      {/* Subject Filter Pills (Touch Carousel strictly within content bounds) */}
       {subjects.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 py-0.5">
-          <button
-            onClick={() => {
-              haptic.selection();
-              setSelectedSubjectFilter(null);
-            }}
-            className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-150 ${
-              selectedSubjectFilter === null
-                ? "bg-foreground text-background"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Все
-          </button>
-          {subjects.map((s) => {
-            const isSelected = selectedSubjectFilter === s.name;
-            return (
-              <button
-                key={s.id}
-                onClick={() => {
-                  haptic.selection();
-                  setSelectedSubjectFilter(isSelected ? null : s.name);
-                }}
-                className={`px-4 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all duration-150 ${
-                  isSelected
-                    ? "bg-foreground text-background"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {s.name}
-              </button>
-            );
-          })}
+        <div className="w-full overflow-hidden">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
+            <button
+              onClick={() => {
+                haptic.selection();
+                setSelectedSubjectFilter(null);
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 ${
+                selectedSubjectFilter === null
+                  ? 'bg-foreground text-background'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Все
+            </button>
+            {subjects.map((s) => {
+              const isSelected = selectedSubjectFilter === s.name;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    haptic.selection();
+                    setSelectedSubjectFilter(isSelected ? null : s.name);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 ${
+                    isSelected
+                      ? 'bg-foreground text-background'
+                      : 'bg-secondary text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {s.name}
+                </button>
+              );
+            })}
+            <div className="shrink-0 w-4" />
+          </div>
         </div>
       )}
 
@@ -194,7 +198,9 @@ export function DashboardView() {
         ) : displayedQueues.length > 0 ? (
           displayedQueues.map((q) => {
             const isEnrolled = userQueueSubjects.has(q.subject);
-            const isCreator = user?.tg_id ? q.created_by_tg_id === user.tg_id : false;
+            const isCreator = user?.tg_id
+              ? q.created_by_tg_id === user.tg_id
+              : false;
             return (
               <QueueCard
                 key={q.subject}
@@ -222,8 +228,8 @@ export function DashboardView() {
               </span>
               <span className="text-xs text-muted-foreground">
                 {search
-                  ? "Попробуйте изменить запрос поиска"
-                  : "Создайте первую очередь нажав кнопку выше"}
+                  ? 'Попробуйте изменить запрос поиска'
+                  : 'Создайте первую очередь нажав кнопку выше'}
               </span>
             </div>
           </div>

@@ -305,81 +305,55 @@ export function ProfileView() {
               haptic.selection();
               setAccentMode("default");
             }}
-            className={`flex items-center justify-between p-3.5 rounded-xl text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center gap-2.5 p-3.5 rounded-xl text-xs font-semibold transition-all border-0 outline-none ${
               accentMode === "default"
-                ? "bg-secondary text-foreground ring-2 ring-primary"
-                : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                ? "bg-primary/15 text-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <div
-                className="w-4 h-4 rounded-full shrink-0 border border-black/10 dark:border-white/10"
-                style={{ backgroundColor: DEFAULT_ACCENT_HEX }}
-              />
-              <span>По умолчанию</span>
-            </div>
-            {accentMode === "default" && (
-              <span className="text-[10px] text-primary font-bold">Активен</span>
-            )}
+            <div
+              className="w-4 h-4 rounded-full shrink-0 border border-black/10 dark:border-white/10"
+              style={{ backgroundColor: DEFAULT_ACCENT_HEX }}
+            />
+            <span>По умолчанию</span>
           </button>
 
           {/* Custom user color */}
           <div
-            className={`relative flex items-center justify-between p-3.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              accentMode === "custom"
-                ? "bg-secondary text-foreground ring-2 ring-primary"
-                : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`}
             onClick={() => {
               if (accentMode !== "custom") {
                 haptic.selection();
                 setAccentMode("custom");
               }
             }}
+            style={{
+              backgroundColor: accentMode === "custom" ? `${customColor}24` : undefined,
+            }}
+            className={`relative flex items-center justify-center gap-2.5 p-3.5 rounded-xl text-xs font-semibold transition-all border-0 outline-none cursor-pointer ${
+              accentMode === "custom"
+                ? "text-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+            }`}
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <label
-                className="relative cursor-pointer shrink-0"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="color"
-                  value={customColor}
-                  onChange={(e) => {
-                    setCustomColor(e.target.value);
-                  }}
-                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                />
-                <div
-                  className="w-4 h-4 rounded-full border border-black/20 dark:border-white/20 shadow-sm"
-                  style={{ backgroundColor: customColor }}
-                  title="Выбрать свой цвет"
-                />
-              </label>
-              <span className="truncate">Свой</span>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              <label
-                className="relative cursor-pointer flex items-center"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="color"
-                  value={customColor}
-                  onChange={(e) => {
-                    setCustomColor(e.target.value);
-                  }}
-                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                />
-                <span className="text-[10px] font-mono opacity-80 uppercase hover:text-primary transition-colors">
-                  {customColor}
-                </span>
-              </label>
-              {accentMode === "custom" && (
-                <span className="text-[10px] text-primary font-bold ml-1">Активен</span>
-              )}
-            </div>
+            <label
+              className="relative cursor-pointer shrink-0 flex items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="color"
+                value={customColor}
+                onChange={(e) => {
+                  setCustomColor(e.target.value);
+                }}
+                className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
+              />
+              <div
+                className="w-4 h-4 rounded-full border border-black/20 dark:border-white/20 shadow-sm"
+                style={{ backgroundColor: customColor }}
+                title="Выбрать свой цвет"
+              />
+            </label>
+            <span className="font-mono text-xs uppercase">{customColor}</span>
           </div>
         </div>
       </div>
