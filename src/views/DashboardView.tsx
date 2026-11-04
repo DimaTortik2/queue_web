@@ -82,7 +82,7 @@ export function DashboardView() {
   };
 
   return (
-    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none">
+    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none native-page-enter">
       {/* Minimal Header: Logo + User Name directly */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -132,9 +132,9 @@ export function DashboardView() {
                 haptic.selection();
                 setSelectedSubjectFilter(null);
               }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
                 selectedSubjectFilter === null
-                  ? 'bg-foreground text-background'
+                  ? 'bg-foreground text-background shadow-sm'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -149,9 +149,9 @@ export function DashboardView() {
                     haptic.selection();
                     setSelectedSubjectFilter(isSelected ? null : s.name);
                   }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 ${
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
                     isSelected
-                      ? 'bg-foreground text-background'
+                      ? 'bg-foreground text-background shadow-sm'
                       : 'bg-secondary text-muted-foreground hover:text-foreground'
                   }`}
                 >

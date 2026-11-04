@@ -126,7 +126,7 @@ export function RequestsView() {
   };
 
   return (
-    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none">
+    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none native-page-enter">
       {/* Header */}
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-bold tracking-tight text-foreground">
@@ -154,7 +154,7 @@ export function RequestsView() {
                     haptic.selection();
                     setSelectedSubject(q.subject);
                   }}
-                  className={`flex flex-col text-left px-4 py-3 rounded-2xl text-xs transition-all duration-150 shrink-0 snap-start min-w-[130px] max-w-[155px] ${
+                  className={`flex flex-col text-left px-4 py-3 rounded-2xl text-xs transition-all duration-150 shrink-0 snap-start min-w-[130px] max-w-[155px] tap-press active:scale-95 ${
                     isSelected
                       ? "bg-foreground text-background shadow-sm"
                       : "bg-secondary text-muted-foreground hover:text-foreground"
@@ -188,15 +188,15 @@ export function RequestsView() {
       ) : null}
 
       {/* Segment Switcher */}
-      <div className="bg-secondary p-1 rounded-2xl flex items-center gap-1">
+      <div className="bg-secondary p-1 rounded-2xl flex items-center gap-1 shadow-inner">
         <button
           onClick={() => {
             haptic.selection();
             setTab("incoming");
           }}
-          className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all duration-150 text-center ${
+          className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all duration-200 text-center tap-press active:scale-[0.98] ${
             tab === "incoming"
-              ? "bg-background text-foreground"
+              ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -207,9 +207,9 @@ export function RequestsView() {
             haptic.selection();
             setTab("outgoing");
           }}
-          className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all duration-150 text-center ${
+          className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all duration-200 text-center tap-press active:scale-[0.98] ${
             tab === "outgoing"
-              ? "bg-background text-foreground"
+              ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >

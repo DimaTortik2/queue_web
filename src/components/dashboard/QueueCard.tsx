@@ -27,7 +27,7 @@ export function QueueCard({
   return (
     <div
       onClick={onClick}
-      className="group relative bg-card hover:bg-secondary/60 active:scale-[0.99] rounded-2xl p-5 flex flex-col gap-4 transition-all duration-150 cursor-pointer select-none"
+      className="group relative bg-card hover:bg-secondary/60 active:scale-[0.975] rounded-2xl p-5 flex flex-col gap-4 transition-all duration-150 cursor-pointer select-none tap-press animate-list-item shadow-sm hover:shadow"
     >
       {/* Top Header */}
       <div className="flex items-start justify-between gap-3">

@@ -45,7 +45,7 @@ function NavigationBar() {
   ];
 
   return (
-    <nav className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-40 bg-card/85 backdrop-blur-xl rounded-full flex items-center justify-between p-1.5 w-[calc(100%-2.5rem)] max-w-[472px] select-none border-0 shadow-none mb-safe transition-all duration-200">
+    <nav className="fixed bottom-3.5 left-1/2 -translate-x-1/2 z-40 bg-card/90 backdrop-blur-2xl rounded-full flex items-center justify-between p-1.5 w-[calc(100%-2.5rem)] max-w-[472px] select-none border border-border/30 shadow-lg shadow-black/5 mb-safe transition-all duration-200">
       {navItems.map((item) => {
         const isActive = location.pathname === item.path;
         const Icon = item.icon;
@@ -54,16 +54,22 @@ function NavigationBar() {
             key={item.path}
             to={item.path}
             onClick={() => haptic.selection()}
-            className={`flex flex-col items-center justify-center flex-1 h-full py-1 rounded-full gap-0.5 transition-all duration-200 active:scale-95 relative ${
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 rounded-full gap-0.5 transition-all duration-200 tap-press active:scale-95 relative ${
               isActive
-                ? "bg-secondary text-foreground font-semibold"
+                ? "bg-secondary text-foreground font-semibold shadow-sm"
                 : "text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30"
             }`}
           >
             <div className="relative">
-              <Icon size={20} weight={isActive ? "fill" : "regular"} className="transition-transform duration-200" />
+              <Icon
+                size={20}
+                weight={isActive ? "fill" : "regular"}
+                className={`transition-transform duration-200 ease-out ${
+                  isActive ? "scale-110" : "scale-100"
+                }`}
+              />
               {item.badge && (
-                <span className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-primary" />
+                <span className="absolute -top-0.5 -right-1 h-2 w-2 rounded-full bg-primary animate-pulse" />
               )}
             </div>
             <span className="text-[10px] tracking-tight leading-tight">{item.label}</span>
@@ -125,8 +131,11 @@ function AppContent() {
 
       <Toaster
         position="top-center"
+        visibleToasts={1}
+        duration={2200}
+        closeButton={false}
         toastOptions={{
-          className: "bg-secondary text-foreground text-xs rounded-2xl",
+          className: "bg-secondary text-foreground text-xs rounded-2xl shadow-md border border-border/40",
         }}
       />
     </div>

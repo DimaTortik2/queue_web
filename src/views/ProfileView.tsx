@@ -98,7 +98,7 @@ export function ProfileView() {
   };
 
   return (
-    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none">
+    <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none native-page-enter">
       {/* Header */}
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-bold tracking-tight text-foreground">

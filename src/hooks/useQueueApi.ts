@@ -164,7 +164,7 @@ export function useJoinQueueMutation() {
       api.joinQueue(subject, data),
     onSuccess: (_, { subject, data }) => {
       haptic.success();
-      toast.success(`Вы заняли место #${data.position}`);
+      toast.success(`Вы заняли место #${data.position}`, { id: `queue_join_${subject}` });
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
       queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(data.tg_id) });
@@ -172,7 +172,7 @@ export function useJoinQueueMutation() {
     },
     onError: (err: Error) => {
       haptic.error();
-      toast.error(err.message || "Не удалось занять место");
+      toast.error(err.message || "Не удалось занять место", { id: "queue_action_err" });
     },
   });
 }
@@ -185,7 +185,7 @@ export function useLeaveQueueMutation() {
       api.leaveQueue(subject, data),
     onSuccess: (_, { subject, data }) => {
       haptic.medium();
-      toast.info("Вы вышли из очереди");
+      toast.info("Вы вышли из очереди", { id: `queue_leave_${subject}` });
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
       queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(data.tg_id) });
@@ -193,7 +193,7 @@ export function useLeaveQueueMutation() {
     },
     onError: (err: Error) => {
       haptic.error();
-      toast.error(err.message || "Ошибка выхода из очереди");
+      toast.error(err.message || "Ошибка выхода из очереди", { id: "queue_action_err" });
     },
   });
 }
@@ -206,13 +206,13 @@ export function useCreateSwapRequestMutation() {
       api.createSwapRequest(subject, data),
     onSuccess: (_, { subject, data }) => {
       haptic.success();
-      toast.success("Запрос на обмен отправлен");
+      toast.success("Запрос на обмен отправлен", { id: "swap_req" });
       queryClient.invalidateQueries({ queryKey: queueKeys.outgoingSwaps(subject, data.from_tg_id) });
       queryClient.invalidateQueries({ queryKey: queueKeys.swapCandidates(subject, data.from_tg_id) });
     },
     onError: (err: Error) => {
       haptic.error();
-      toast.error(err.message || "Ошибка создания запроса на обмен");
+      toast.error(err.message || "Ошибка создания запроса на обмен", { id: "swap_err" });
     },
   });
 }
@@ -231,14 +231,14 @@ export function useAcceptSwapMutation() {
     }) => api.acceptSwapRequest(requestId, data),
     onSuccess: (_, { subject, data }) => {
       haptic.success();
-      toast.success("Обмен местами подтвержден");
+      toast.success("Обмен местами подтвержден", { id: "swap_accepted" });
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
       queryClient.invalidateQueries({ queryKey: queueKeys.incomingSwaps(subject, data.tg_id) });
     },
     onError: (err: Error) => {
       haptic.error();
-      toast.error(err.message || "Ошибка подтверждения обмена");
+      toast.error(err.message || "Ошибка подтверждения обмена", { id: "swap_err" });
     },
   });
 }

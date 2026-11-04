@@ -109,3 +109,74 @@
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+
+/* ──────────────────── Native Mobile Animations (Zero Lag / GPU Accelerated) ──────────────────── */
+
+@keyframes nativePageEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.native-page-enter {
+  animation: nativePageEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes listItemEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-list-item {
+  animation: listItemEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+/* Stagger delay helpers for list cascades */
+.stagger-1 { animation-delay: 25ms; }
+.stagger-2 { animation-delay: 50ms; }
+.stagger-3 { animation-delay: 75ms; }
+.stagger-4 { animation-delay: 100ms; }
+.stagger-5 { animation-delay: 125ms; }
+
+/* Native iOS-like tactile press with spring physics */
+.tap-press {
+  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.16s ease;
+  will-change: transform;
+}
+.tap-press:active {
+  transform: scale(0.97);
+}
+
+/* Telegram-grade Shimmer for loading skeletons */
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--secondary) / 0.55) 0%,
+    hsl(var(--secondary) / 0.95) 50%,
+    hsl(var(--secondary) / 0.55) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.6s infinite ease-in-out;
+}

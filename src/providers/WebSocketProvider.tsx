@@ -33,7 +33,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       switch (msg.event) {
         case "incoming_swap_request":
           haptic.warning();
-          toast.info(msg.message || "Вам предложен обмен местами");
+          toast.info(msg.message || "Вам предложен обмен местами", { id: "incoming_swap" });
           if (msg.data) {
             setActiveSwapProposal(msg.data);
           }
@@ -47,7 +47,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "swap_accepted":
           haptic.success();
-          toast.success(msg.message || "Ваш запрос на обмен принят");
+          toast.success(msg.message || "Ваш запрос на обмен принят", { id: "swap_accepted" });
           if (msg.subject) {
             queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
             queryClient.invalidateQueries({
@@ -60,7 +60,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "swap_rejected":
           haptic.error();
-          toast.info(msg.message || "Запрос на обмен отклонен");
+          toast.info(msg.message || "Запрос на обмен отклонен", { id: "swap_rejected" });
           if (msg.subject) {
             queryClient.invalidateQueries({
               queryKey: queueKeys.outgoingSwaps(msg.subject, user.tg_id),
@@ -71,7 +71,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "swap_cancelled":
           haptic.light();
-          toast.info(msg.message || "Запрос на обмен отозван");
+          toast.info(msg.message || "Запрос на обмен отозван", { id: "swap_cancelled" });
           if (msg.subject) {
             queryClient.invalidateQueries({
               queryKey: queueKeys.incomingSwaps(msg.subject, user.tg_id),
@@ -88,7 +88,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             message: msg.message || "Вы следующий в очереди! Подойдите к преподавателю.",
             timestamp: Date.now(),
           });
-          toast.warning(msg.message || "Вы следующий в очереди!");
+          toast.warning(msg.message || "Вы следующий в очереди!", { id: "your_turn" });
           break;
 
         case "submission_completed":
@@ -99,7 +99,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             message: msg.message || "Ваша сдача завершена!",
             timestamp: Date.now(),
           });
-          toast.success(msg.message || "Ваша сдача завершена");
+          toast.success(msg.message || "Ваша сдача завершена", { id: "submission_completed" });
           if (msg.subject) {
             queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
             queryClient.invalidateQueries({
@@ -117,7 +117,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             message: msg.message || "Вы были удалены из очереди курирующим.",
             timestamp: Date.now(),
           });
-          toast.error(msg.message || "Вы были удалены из очереди");
+          toast.error(msg.message || "Вы были удалены из очереди", { id: "kicked" });
           if (msg.subject) {
             queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
             queryClient.invalidateQueries({

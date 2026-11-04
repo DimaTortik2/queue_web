@@ -28,15 +28,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantClasses = {
       default:
-        "bg-foreground text-background hover:opacity-90 active:scale-[0.98]",
+        "bg-foreground text-background hover:opacity-90 active:scale-[0.965]",
       secondary:
-        "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98]",
+        "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.965]",
       subtle:
-        "bg-muted/60 text-foreground hover:bg-muted active:scale-[0.98]",
+        "bg-muted/60 text-foreground hover:bg-muted active:scale-[0.965]",
       ghost:
-        "text-foreground hover:bg-secondary/60 active:scale-[0.98]",
+        "text-foreground hover:bg-secondary/60 active:scale-[0.965]",
       destructive:
-        "bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-[0.98]",
+        "bg-destructive/10 text-destructive hover:bg-destructive/20 active:scale-[0.965]",
     };
 
     const sizeClasses = {
@@ -64,7 +64,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         className={cn(
-          "inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-150 ease-out select-none cursor-pointer",
+          "inline-flex items-center justify-center gap-2 whitespace-nowrap transition-all duration-150 ease-out select-none cursor-pointer tap-press",
           variantClasses[variant],
           sizeClasses[size],
           disabled && "opacity-40 cursor-not-allowed active:scale-100",

@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   Trash,
   X,
   Copy,
   ArrowsLeftRight,
   UserPlus,
-} from "@phosphor-icons/react";
+} from '@phosphor-icons/react';
 import {
   Drawer,
   DrawerContent,
@@ -15,13 +15,13 @@ import {
   DrawerDescription,
   DrawerFooter,
   DrawerClose,
-} from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { RetryBanner } from "@/components/ui/retry-banner";
-import { haptic } from "@/lib/telegram";
-import { useUserStore } from "@/store/userStore";
+} from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RetryBanner } from '@/components/ui/retry-banner';
+import { haptic } from '@/lib/telegram';
+import { useUserStore } from '@/store/userStore';
 import {
   useQueuesList,
   useQueueDetail,
@@ -30,9 +30,9 @@ import {
   useLeaveQueueMutation,
   useCuratorDeleteQueueMutation,
   useCuratorKickMutation,
-} from "@/hooks/useQueueApi";
-import { useRoomSubscription } from "@/providers/WebSocketProvider";
-import { DirectSwapDrawer } from "@/components/queue/DirectSwapDrawer";
+} from '@/hooks/useQueueApi';
+import { useRoomSubscription } from '@/providers/WebSocketProvider';
+import { DirectSwapDrawer } from '@/components/queue/DirectSwapDrawer';
 
 interface QueueSlotsModalProps {
   subject: string | null;
@@ -55,7 +55,7 @@ export function QueueSlotsModal({
   } | null>(null);
 
   const [isDeleteDrawerOpen, setIsDeleteDrawerOpen] = useState(false);
-  const [deleteInputText, setDeleteInputText] = useState("");
+  const [deleteInputText, setDeleteInputText] = useState('');
   const [isDirectSwapOpen, setIsDirectSwapOpen] = useState(false);
 
   // Real-time WebSocket connection
@@ -77,7 +77,9 @@ export function QueueSlotsModal({
   const deleteMutation = useCuratorDeleteQueueMutation();
   const kickMutation = useCuratorKickMutation();
 
-  const isCreator = user?.tg_id ? currentMeta?.created_by_tg_id === user.tg_id : false;
+  const isCreator = user?.tg_id
+    ? currentMeta?.created_by_tg_id === user.tg_id
+    : false;
   const myPosition = myPosData?.position || null;
   const totalPositions = queueData?.total_positions || 30;
 
@@ -88,7 +90,7 @@ export function QueueSlotsModal({
     slotPos: number,
     isFree: boolean,
     slotUserId?: number | null,
-    name?: string | null
+    name?: string | null,
   ) => {
     haptic.selection();
 
@@ -104,7 +106,9 @@ export function QueueSlotsModal({
     // 2. Click on free slot while enrolled
     if (isFree && myPosition) {
       haptic.warning();
-      toast.info(`Вы уже записаны на место ${myPosition}. Сначала освободите его, чтобы сменить.`);
+      toast.info(
+        `Вы уже записаны на место ${myPosition}. Сначала освободите его, чтобы сменить.`,
+      );
       return;
     }
 
@@ -134,7 +138,7 @@ export function QueueSlotsModal({
     // 6. Not enrolled
     if (!isFree && !myPosition && !isCreator) {
       haptic.warning();
-      toast.info("Займите свободное место, чтобы предлагать обмен");
+      toast.info('Займите свободное место, чтобы предлагать обмен');
       return;
     }
   };
@@ -163,10 +167,10 @@ export function QueueSlotsModal({
       {
         onSuccess: () => {
           setIsDeleteDrawerOpen(false);
-          setDeleteInputText("");
+          setDeleteInputText('');
           onClose();
         },
-      }
+      },
     );
   };
 
@@ -174,7 +178,10 @@ export function QueueSlotsModal({
     if (!subject || !user?.tg_id || !selectedSlotForKick) return;
     kickMutation.mutate({
       subject,
-      data: { curator_tg_id: user.tg_id, target_tg_id: selectedSlotForKick.tgId },
+      data: {
+        curator_tg_id: user.tg_id,
+        target_tg_id: selectedSlotForKick.tgId,
+      },
     });
     setSelectedSlotForKick(null);
   };
@@ -203,11 +210,7 @@ export function QueueSlotsModal({
                 {subject}
               </DrawerTitle>
               <div className="flex items-center gap-1.5 shrink-0">
-                {isCreator && (
-                  <Badge variant="subtle">
-                    Создатель
-                  </Badge>
-                )}
+                {isCreator && <Badge variant="subtle">Создатель</Badge>}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -216,7 +219,7 @@ export function QueueSlotsModal({
                     if (!subject) return;
                     navigator.clipboard.writeText(subject);
                     haptic.light();
-                    toast.info("Название скопировано");
+                    toast.info('Название скопировано');
                   }}
                   title="Скопировать название"
                   aria-label="Скопировать название"
@@ -225,12 +228,12 @@ export function QueueSlotsModal({
                 </Button>
               </div>
             </div>
-            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1">
+            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1 text-left">
               {isCreator
-                ? "Вы создали эту очередь. Нажмите на участника, чтобы исключить его."
+                ? 'Вы создали эту очередь. Нажмите на участника, чтобы исключить его.'
                 : myPosition
-                ? "Нажмите на любого участника для предложения обмена местами."
-                : "Выберите свободный номер или нажмите кнопку ниже."}
+                  ? 'Нажмите на любого участника для предложения обмена местами.'
+                  : 'Выберите свободный номер или нажмите кнопку ниже.'}
             </DrawerDescription>
           </DrawerHeader>
 
@@ -238,10 +241,16 @@ export function QueueSlotsModal({
           {selectedSlotForKick && isCreator && (
             <div className="mx-6 mb-3 bg-destructive/10 rounded-2xl p-3.5 flex items-center justify-between text-xs animate-in fade-in">
               <span className="font-semibold text-destructive">
-                Исключить {selectedSlotForKick.name} (место {selectedSlotForKick.pos})?
+                Исключить {selectedSlotForKick.name} (место{' '}
+                {selectedSlotForKick.pos})?
               </span>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="destructive" className="h-8 rounded-xl px-3" onClick={handleKickConfirm}>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="h-8 rounded-xl px-3"
+                  onClick={handleKickConfirm}
+                >
                   Исключить
                 </Button>
                 <Button
@@ -280,24 +289,38 @@ export function QueueSlotsModal({
 
                 <div className="grid grid-cols-5 gap-2.5 pb-2">
                   {slots.map((slot) => {
-                    let bgClass = "bg-secondary text-muted-foreground hover:bg-secondary/80";
+                    let bgClass =
+                      'bg-secondary text-muted-foreground hover:bg-secondary/80';
                     if (slot.isMe) {
-                      bgClass = "bg-primary text-primary-foreground font-semibold";
+                      bgClass =
+                        'bg-primary text-primary-foreground font-semibold';
                     } else if (!slot.isFree) {
-                      bgClass = "bg-card text-foreground hover:bg-secondary font-medium";
+                      bgClass =
+                        'bg-card text-foreground hover:bg-secondary font-medium';
                     }
 
                     return (
                       <button
                         key={slot.pos}
                         onClick={() =>
-                          handleSlotClick(slot.pos, slot.isFree, slot.tgId, slot.name)
+                          handleSlotClick(
+                            slot.pos,
+                            slot.isFree,
+                            slot.tgId,
+                            slot.name,
+                          )
                         }
-                        className={`flex flex-col items-center justify-center p-2.5 rounded-2xl min-h-[58px] transition-all duration-150 active:scale-95 text-center select-none ${bgClass}`}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-2xl min-h-[58px] transition-all duration-150 tap-press active:scale-95 text-center select-none ${bgClass}`}
                       >
-                        <span className="text-sm font-bold leading-none">{slot.pos}</span>
+                        <span className="text-sm font-bold leading-none">
+                          {slot.pos}
+                        </span>
                         <span className="text-[10px] truncate max-w-full mt-1.5 opacity-80 font-medium">
-                          {slot.isMe ? "Вы" : slot.isFree ? "Свободно" : slot.name?.split(" ")[0]}
+                          {slot.isMe
+                            ? 'Вы'
+                            : slot.isFree
+                              ? 'Свободно'
+                              : slot.name?.split(' ')[0]}
                         </span>
                       </button>
                     );
@@ -316,10 +339,12 @@ export function QueueSlotsModal({
                   variant="secondary"
                   className="rounded-2xl h-11 text-xs font-semibold gap-1.5"
                   onClick={() => setIsDirectSwapOpen(true)}
-                  disabled={!queueData?.taken_positions || queueData.taken_positions < 2}
+                  disabled={
+                    !queueData?.taken_positions || queueData.taken_positions < 2
+                  }
                   disabledReason={
                     !queueData?.taken_positions || queueData.taken_positions < 2
-                      ? "Нужно минимум 2 участника для прямого обмена"
+                      ? 'Нужно минимум 2 участника для прямого обмена'
                       : undefined
                   }
                 >
@@ -346,15 +371,18 @@ export function QueueSlotsModal({
                   variant="default"
                   className="flex-1 rounded-2xl h-12 text-sm font-semibold gap-2"
                   onClick={handleQuickJoinFirst}
-                  disabled={joinMutation.isPending || queueData?.taken_positions === totalPositions}
+                  disabled={
+                    joinMutation.isPending ||
+                    queueData?.taken_positions === totalPositions
+                  }
                   disabledReason={
                     queueData?.taken_positions === totalPositions
-                      ? "Все места в этой очереди уже заняты"
+                      ? 'Все места в этой очереди уже заняты'
                       : undefined
                   }
                 >
                   <UserPlus size={18} weight="bold" />
-                  Занять свободное (место {firstFreeSlot})
+                  Занять свободное
                 </Button>
               ) : (
                 <Button
@@ -368,7 +396,10 @@ export function QueueSlotsModal({
               )}
 
               <DrawerClose asChild>
-                <Button variant="secondary" className="px-5 rounded-2xl h-12 text-sm font-medium">
+                <Button
+                  variant="secondary"
+                  className="px-5 rounded-2xl h-12 text-sm font-medium"
+                >
                   Закрыть
                 </Button>
               </DrawerClose>
@@ -383,7 +414,7 @@ export function QueueSlotsModal({
         onOpenChange={(open) => {
           if (!open) {
             setIsDeleteDrawerOpen(false);
-            setDeleteInputText("");
+            setDeleteInputText('');
           }
         }}
       >
@@ -392,8 +423,9 @@ export function QueueSlotsModal({
             <DrawerTitle className="text-xl font-bold tracking-tight text-destructive">
               Удаление очереди
             </DrawerTitle>
-            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1">
-              Очередь «{subject}» будет безвозвратно удалена, а все участники потеряют свои места.
+            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1 text-left">
+              Очередь «{subject}» будет безвозвратно удалена, а все участники
+              потеряют свои места.
             </DrawerDescription>
           </DrawerHeader>
 
@@ -416,13 +448,21 @@ export function QueueSlotsModal({
               variant="destructive"
               className="w-full rounded-2xl h-12 text-sm font-semibold"
               onClick={handleDeleteConfirm}
-              disabled={deleteInputText.trim().toLowerCase() !== "удалить" || deleteMutation.isPending}
+              disabled={
+                deleteInputText.trim().toLowerCase() !== 'удалить' ||
+                deleteMutation.isPending
+              }
               disabledReason="Введите слово «удалить»"
             >
-              {deleteMutation.isPending ? "Удаление..." : "Подтвердить удаление"}
+              {deleteMutation.isPending
+                ? 'Удаление...'
+                : 'Подтвердить удаление'}
             </Button>
             <DrawerClose asChild>
-              <Button variant="secondary" className="w-full rounded-2xl h-12 text-sm font-medium">
+              <Button
+                variant="secondary"
+                className="w-full rounded-2xl h-12 text-sm font-medium"
+              >
                 Отмена
               </Button>
             </DrawerClose>
