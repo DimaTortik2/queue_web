@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Plus, MagnifyingGlass } from '@phosphor-icons/react';
+import { Plus, MagnifyingGlass, SortAscending } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ export function DashboardView() {
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<
     string | null
   >(null);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Modals state
   const [selectedQueueSubject, setSelectedQueueSubject] = useState<
@@ -116,16 +117,38 @@ export function DashboardView() {
     return allQueues.filter((q) => q.subject_name === selectedSubjectFilter);
   }, [allQueues, selectedSubjectFilter]);
 
-  // Sort: pinned first, then by creator/active
+  // Sort: pinned first, then by date (newest first by default, or inverted)
   const displayedQueues = useMemo(() => {
     return [...filteredQueues].sort((a, b) => {
       const aPinned = isPinned(a.subject);
       const bPinned = isPinned(b.subject);
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
-      return 0;
+
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+
+      if (timeA !== timeB) {
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      return (a.subject || '').localeCompare(b.subject || '', 'ru');
     });
-  }, [filteredQueues, isPinned]);
+  }, [filteredQueues, isPinned, sortOrder]);
+
+  const handleSelectFilter = useCallback(
+    (subjectName: string | null) => {
+      haptic.selection();
+      if (selectedSubjectFilter === subjectName) {
+        // Toggle sort order when clicking the already active filter
+        setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+      } else {
+        // Selecting another filter resets sort to default (newest first)
+        setSelectedSubjectFilter(subjectName);
+        setSortOrder('desc');
+      }
+    },
+    [selectedSubjectFilter]
+  );
 
   const handleOpenQueue = useCallback((subject: string) => {
     haptic.selection();
@@ -199,38 +222,38 @@ export function DashboardView() {
       </div>
 
       {/* Subject Filter Pills (Touch Carousel strictly within content bounds) */}
-      {activeSubjects.length > 0 && (
+      {(allQueues.length > 0 || activeSubjects.length > 0) && (
         <div className="w-full overflow-hidden">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
             <button
-              onClick={() => {
-                haptic.selection();
-                setSelectedSubjectFilter(null);
-              }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+              onClick={() => handleSelectFilter(null)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
                 selectedSubjectFilter === null
                   ? 'bg-foreground text-background shadow-sm'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
               }`}
             >
-              Все
+              <span>Все</span>
+              {selectedSubjectFilter === null && sortOrder === 'asc' && (
+                <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+              )}
             </button>
             {activeSubjects.map((s) => {
               const isSelected = selectedSubjectFilter === s.name;
               return (
                 <button
                   key={s.id}
-                  onClick={() => {
-                    haptic.selection();
-                    setSelectedSubjectFilter(isSelected ? null : s.name);
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+                  onClick={() => handleSelectFilter(s.name)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
                     isSelected
                       ? 'bg-foreground text-background shadow-sm'
                       : 'bg-secondary text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {s.name}
+                  <span>{s.name}</span>
+                  {isSelected && sortOrder === 'asc' && (
+                    <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+                  )}
                 </button>
               );
             })}

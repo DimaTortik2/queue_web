@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowsLeftRight, Check, X } from '@phosphor-icons/react';
+import { ArrowsLeftRight, Check, X, SortAscending } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ export function RequestsView() {
   const { setPendingIncomingCount } = useNotificationStore();
   const [tab, setTab] = useState<'incoming' | 'outgoing'>('incoming');
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // Active queues of current user
   const { data: userQueuesData } = useUserActiveQueues(user?.tg_id);
@@ -62,8 +63,44 @@ export function RequestsView() {
   const rejectMutation = useRejectSwapMutation();
   const cancelMutation = useCancelSwapMutation();
 
-  const incomingRequests = incomingData?.requests || [];
-  const outgoingRequests = outgoingData?.requests || [];
+  const rawIncoming = incomingData?.requests || [];
+  const rawOutgoing = outgoingData?.requests || [];
+
+  const incomingRequests = useMemo(() => {
+    return [...rawIncoming].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) {
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      return 0;
+    });
+  }, [rawIncoming, sortOrder]);
+
+  const outgoingRequests = useMemo(() => {
+    return [...rawOutgoing].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      if (timeA !== timeB) {
+        return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      return 0;
+    });
+  }, [rawOutgoing, sortOrder]);
+
+  const handleSelectSubject = useCallback(
+    (subject: string | null) => {
+      haptic.selection();
+      if (selectedSubject === subject) {
+        // Toggle sort order
+        setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+      } else {
+        setSelectedSubject(subject);
+        setSortOrder('desc');
+      }
+    },
+    [selectedSubject]
+  );
 
   const pendingCount = incomingRequests.filter(
     (r) => !r.status || r.status === 'pending',
@@ -126,34 +163,34 @@ export function RequestsView() {
         <div className="w-full overflow-hidden">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
             <button
-              onClick={() => {
-                haptic.selection();
-                setSelectedSubject(null);
-              }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+              onClick={() => handleSelectSubject(null)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
                 selectedSubject === null
                   ? 'bg-foreground text-background shadow-sm'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
               }`}
             >
-              Все
+              <span>Все</span>
+              {selectedSubject === null && sortOrder === 'asc' && (
+                <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+              )}
             </button>
             {uniqueUserQueues.map((q) => {
               const isSelected = selectedSubject === q.subject;
               return (
                 <button
                   key={q.subject}
-                  onClick={() => {
-                    haptic.selection();
-                    setSelectedSubject(isSelected ? null : q.subject);
-                  }}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+                  onClick={() => handleSelectSubject(q.subject)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
                     isSelected
                       ? 'bg-foreground text-background shadow-sm'
                       : 'bg-secondary text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  {q.queue_type || q.subject}
+                  <span>{q.queue_type || q.subject}</span>
+                  {isSelected && sortOrder === 'asc' && (
+                    <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+                  )}
                 </button>
               );
             })}
