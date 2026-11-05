@@ -40,7 +40,7 @@ const MONTH_NAMES = [
   'Декабрь',
 ];
 
-const WEEK_DAYS = ['П', 'В', 'С', 'Ч', 'П', 'С', 'В'];
+const WEEK_DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 export function GoogleCalendarTimeDrawer({
   isOpen,

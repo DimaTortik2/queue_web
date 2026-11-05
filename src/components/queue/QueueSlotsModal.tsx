@@ -4,7 +4,7 @@ import { QueueMetaInfo, QueueUserInfo } from '@/types';
 import {
   Trash,
   X,
-  Copy,
+  ShareNetwork,
   ArrowsLeftRight,
   UserPlus,
   PencilSimple,
@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RetryBanner } from '@/components/ui/retry-banner';
 import { haptic } from '@/lib/telegram';
+import { copyQueueLink } from '@/lib/deepLink';
 import { useUserStore } from '@/store/userStore';
 import {
   useQueuesList,
@@ -363,16 +364,21 @@ export function QueueSlotsModal({
                   size="sm"
                   variant="ghost"
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
-                  onClick={() => {
+                  onClick={async () => {
                     if (!subject) return;
-                    navigator.clipboard.writeText(subject);
-                    haptic.light();
-                    toast.info('Название скопировано');
+                    try {
+                      await copyQueueLink(subject);
+                      haptic.light();
+                      toast.success('Ссылка на очередь скопирована');
+                    } catch {
+                      haptic.error();
+                      toast.error('Не удалось скопировать ссылку');
+                    }
                   }}
-                  title="Скопировать название"
-                  aria-label="Скопировать название"
+                  title="Скопировать ссылку"
+                  aria-label="Скопировать ссылку"
                 >
-                  <Copy size={16} />
+                  <ShareNetwork size={16} />
                 </Button>
               </div>
             </div>

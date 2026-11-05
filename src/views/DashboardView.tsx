@@ -1,11 +1,12 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Plus, MagnifyingGlass } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RetryBanner } from '@/components/ui/retry-banner';
-import { haptic } from '@/lib/telegram';
+import { haptic, getTelegramStartParam } from '@/lib/telegram';
+import { resolveQueueSubject } from '@/lib/deepLink';
 import {
   useQueuesList,
   useUserActiveQueues,
@@ -82,6 +83,22 @@ export function DashboardView() {
       setSelectedSubjectFilter(null);
     }
   }, [selectedSubjectFilter, activeSubjects]);
+
+  // Auto-open queue drawer when app is launched via Telegram startapp deep link
+  const hasHandledDeepLink = useRef(false);
+  useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+
+    const rawParam = getTelegramStartParam();
+    if (!rawParam) return;
+
+    const resolved = resolveQueueSubject(rawParam, allQueues);
+    if (resolved) {
+      hasHandledDeepLink.current = true;
+      setSelectedQueueSubject(resolved);
+      setIsSlotsModalOpen(true);
+    }
+  }, [allQueues]);
 
   const userPositionsMap = useMemo(() => {
     const map = new Map<string, number>();

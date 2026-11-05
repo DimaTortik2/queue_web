@@ -10,6 +10,7 @@ declare global {
           query_id?: string;
           auth_date?: string;
           hash?: string;
+          start_param?: string;
         };
         version: string;
         platform: string;
@@ -37,6 +38,8 @@ declare global {
         enableClosingConfirmation: () => void;
         disableClosingConfirmation?: () => void;
         disableVerticalSwipes?: () => void;
+        openTelegramLink?: (url: string) => void;
+        openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;
         onEvent: (eventType: string, eventHandler: () => void) => void;
         offEvent: (eventType: string, eventHandler: () => void) => void;
         BackButton: {
@@ -131,6 +134,25 @@ export function getTelegramUser(): TelegramUser | null {
 
 export function getTelegramInitData(): string {
   return tg()?.initData || "";
+}
+
+export function getTelegramStartParam(): string | null {
+  const app = tg();
+  if (app?.initDataUnsafe?.start_param) {
+    return app.initDataUnsafe.start_param;
+  }
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    return (
+      urlParams.get("tgWebAppStartParam") ||
+      urlParams.get("startapp") ||
+      urlParams.get("start_param") ||
+      urlParams.get("queue") ||
+      null
+    );
+  } catch {
+    return null;
+  }
 }
 
 function canVibrate(): boolean {

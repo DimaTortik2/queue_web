@@ -121,10 +121,6 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
           <DrawerTitle className="text-xl font-bold tracking-tight text-foreground">
             Новая очередь
           </DrawerTitle>
-          <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1">
-            Выберите предмет из списка или введите свой, а также тип сдачи и
-            срок жизни очереди.
-          </DrawerDescription>
         </DrawerHeader>
 
         <div className="flex flex-col gap-5 px-6 py-3 max-h-[60vh] overflow-y-auto no-scrollbar">
@@ -304,7 +300,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                 : subjectName === 'custom' && !customSubject.trim()
                   ? 'Введите название предмета'
                   : !queueType.trim()
-                    ? 'Введите тип сдачи (например: Лабораторная 1)'
+                    ? 'Введите тип сдачи'
                     : !isAutoDeleteValid
                       ? 'Выберите корректное время удаления'
                       : undefined
