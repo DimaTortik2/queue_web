@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Plus } from '@phosphor-icons/react';
 import {
   Drawer,
@@ -18,6 +18,7 @@ import {
   useJoinQueueMutation,
 } from '@/hooks/useQueueApi';
 import { haptic } from '@/lib/telegram';
+import { AutoDeleteSelector } from '@/components/queue/AutoDeleteSelector';
 
 interface CreateQueueDrawerProps {
   isOpen: boolean;
@@ -37,8 +38,18 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
   const [maxPositions, setMaxPositions] = useState<number>(30);
   const [chosenPosition, setChosenPosition] = useState<number>(1);
   const [joinImmediately, setJoinImmediately] = useState<boolean>(true);
+  const [autoDeleteAt, setAutoDeleteAt] = useState<string | null>(null);
+  const [isAutoDeleteValid, setIsAutoDeleteValid] = useState<boolean>(true);
 
   const subjects = subjectsData?.subject_list || [];
+
+  const handleAutoDeleteChange = useCallback(
+    (isoString: string | null, isValid: boolean) => {
+      setAutoDeleteAt(isoString);
+      setIsAutoDeleteValid(isValid);
+    },
+    [],
+  );
 
   const handleCreate = async () => {
     const finalSubject = (
@@ -46,7 +57,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
     ).trim();
     const finalType = queueType.trim();
 
-    if (!finalSubject || !finalType || !user?.tg_id) return;
+    if (!finalSubject || !finalType || !user?.tg_id || !isAutoDeleteValid)
+      return;
 
     // Auto-register custom subject in catalog if it doesn't exist yet
     const alreadyExists = subjects.some(
@@ -65,6 +77,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
         subject_name: finalSubject,
         queue_type: finalType,
         created_by_tg_id: user.tg_id,
+        auto_delete_at: autoDeleteAt,
       },
       {
         onSuccess: () => {
@@ -88,6 +101,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
           setQueueType('');
           setMaxPositions(30);
           setChosenPosition(1);
+          setAutoDeleteAt(null);
+          setIsAutoDeleteValid(true);
         },
       },
     );
@@ -95,7 +110,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
 
   const isFormValid = Boolean(
     (subjectName === 'custom' ? customSubject.trim() : subjectName.trim()) &&
-    queueType.trim(),
+    queueType.trim() &&
+    isAutoDeleteValid,
   );
 
   return (
@@ -106,7 +122,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             Новая очередь
           </DrawerTitle>
           <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1">
-            Выберите предмет из списка или введите свой, а также тип сдачи.
+            Выберите предмет из списка или введите свой, а также тип сдачи и
+            срок жизни очереди.
           </DrawerDescription>
         </DrawerHeader>
 
@@ -164,7 +181,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
               </label>
               <input
                 type="text"
-                placeholder="Например: Базы данных (добавится в каталог)"
+                placeholder="ИРВР.."
                 value={customSubject}
                 onChange={(e) => setCustomSubject(e.target.value)}
                 className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-medium focus:bg-card focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground/50 border-0 outline-none"
@@ -180,7 +197,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             </label>
             <input
               type="text"
-              placeholder="Лабораторная 1..."
+              placeholder="Лаба 1..."
               value={queueType}
               onChange={(e) => setQueueType(e.target.value)}
               className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-medium focus:bg-card focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground/50 border-0 outline-none"
@@ -220,6 +237,12 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             </div>
           </div>
 
+          {/* Auto-Delete / Self-Destruct Selection */}
+          <AutoDeleteSelector
+            value={autoDeleteAt}
+            onChange={handleAutoDeleteChange}
+          />
+
           {/* Creator Slot Selection - Smooth Horizontal Carousel strictly within bounds */}
           <div className="flex flex-col gap-2 pt-1">
             <div className="flex items-center justify-between">
@@ -231,7 +254,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                 onClick={() => setJoinImmediately(!joinImmediately)}
                 className="text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                {joinImmediately ? 'Встать в очередь' : 'Не занимать место'}
+                {joinImmediately ? 'Не хочу пока вступать' : 'А нет, хочу'}
               </button>
             </div>
 
@@ -264,9 +287,6 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                     <div className="shrink-0 w-4" />
                   </div>
                 </div>
-                <span className="text-[11px] text-muted-foreground">
-                  Выбрано место #{chosenPosition}
-                </span>
               </div>
             )}
           </div>
@@ -285,7 +305,9 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                   ? 'Введите название предмета'
                   : !queueType.trim()
                     ? 'Введите тип сдачи (например: Лабораторная 1)'
-                    : undefined
+                    : !isAutoDeleteValid
+                      ? 'Выберите корректное время удаления'
+                      : undefined
             }
             className="w-full rounded-2xl h-12 text-sm font-semibold gap-1.5"
           >

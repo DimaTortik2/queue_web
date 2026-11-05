@@ -63,6 +63,7 @@ export interface QueueMetaInfo {
   created_by_tg_id: number;
   created_by_name?: string | null;
   created_at: string;
+  auto_delete_at?: string | null;
   taken_positions: number;
   total_positions: number;
   is_paused: boolean;
@@ -138,6 +139,7 @@ export interface QueueCreateDto {
   subject_name: string;
   queue_type: string;
   created_by_tg_id: number;
+  auto_delete_at?: string | null;
 }
 
 export interface KickDto {
@@ -156,6 +158,11 @@ export interface PauseQueueDto {
 
 export interface ClearQueueDto {
   curator_tg_id: number;
+}
+
+export interface UpdateAutoDeleteDto {
+  curator_tg_id: number;
+  auto_delete_at?: string | null;
 }
 
 export interface SwapRequestCreateDto {

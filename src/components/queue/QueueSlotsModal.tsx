@@ -6,6 +6,7 @@ import {
   Copy,
   ArrowsLeftRight,
   UserPlus,
+  PencilSimple,
 } from '@phosphor-icons/react';
 import {
   Drawer,
@@ -30,10 +31,13 @@ import {
   useLeaveQueueMutation,
   useCuratorDeleteQueueMutation,
   useCuratorKickMutation,
+  useUpdateAutoDeleteMutation,
 } from '@/hooks/useQueueApi';
 import { useRoomSubscription } from '@/providers/WebSocketProvider';
 import { DirectSwapDrawer } from '@/components/queue/DirectSwapDrawer';
 import { SlotAvatar } from '@/components/ui/SlotAvatar';
+import { formatAutoDeleteTime, parseMskIso } from '@/lib/dateUtils';
+import { GoogleCalendarTimeDrawer } from '@/components/queue/GoogleCalendarTimeDrawer';
 
 interface QueueSlotsModalProps {
   subject: string | null;
@@ -90,6 +94,9 @@ export function QueueSlotsModal({
   const leaveMutation = useLeaveQueueMutation();
   const deleteMutation = useCuratorDeleteQueueMutation();
   const kickMutation = useCuratorKickMutation();
+  const updateAutoDeleteMutation = useUpdateAutoDeleteMutation();
+
+  const [isAutoDeleteDrawerOpen, setIsAutoDeleteDrawerOpen] = useState(false);
 
   const isCreator = user?.tg_id
     ? currentMeta?.created_by_tg_id === user.tg_id
@@ -204,6 +211,10 @@ export function QueueSlotsModal({
   const subjectName =
     currentMeta?.subject_name ||
     (subject && colonIdx !== -1 ? subject.slice(0, colonIdx).trim() : null);
+  const autoDeleteLabel = formatAutoDeleteTime(currentMeta?.auto_delete_at);
+  const parsedAutoDelete = currentMeta?.auto_delete_at
+    ? parseMskIso(currentMeta.auto_delete_at)
+    : null;
   const queueType =
     currentMeta?.queue_type ||
     (subject && colonIdx !== -1 ? subject.slice(colonIdx + 1).trim() : null);
@@ -263,6 +274,44 @@ export function QueueSlotsModal({
                 Занято {queueData?.taken_positions || 0} из {totalPositions}
               </span>
             </div>
+            {/* Auto Delete Badge / Button */}
+            {isCreator ? (
+              autoDeleteLabel ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic.selection();
+                    setIsAutoDeleteDrawerOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 mt-2 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all rounded-xl px-3 py-1.5 w-fit select-none"
+                  title="Нажмите, чтобы изменить или отключить автоудаление"
+                >
+                  <Trash size={13} weight="bold" />
+                  <span>{autoDeleteLabel}</span>
+                  <PencilSimple size={12} weight="bold" className="opacity-70 ml-0.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic.selection();
+                    setIsAutoDeleteDrawerOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 mt-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary hover:bg-secondary/80 active:scale-95 transition-all rounded-xl px-3 py-1.5 w-fit select-none"
+                  title="Указать время автоудаления очереди"
+                >
+                  <Trash size={13} weight="bold" />
+                  <span>Указать автоудаление</span>
+                </button>
+              )
+            ) : (
+              autoDeleteLabel && (
+                <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-primary bg-primary/10 rounded-xl px-3 py-1.5 w-fit select-none">
+                  <Trash size={13} weight="bold" />
+                  <span>{autoDeleteLabel}</span>
+                </div>
+              )
+            )}
           </DrawerHeader>
 
           {/* Kick Confirmation Bar */}
@@ -510,6 +559,40 @@ export function QueueSlotsModal({
         isOpen={isDirectSwapOpen}
         onClose={() => setIsDirectSwapOpen(false)}
       />
+
+      {/* Auto-Delete Time Editor for Creator */}
+      {isCreator && (
+        <GoogleCalendarTimeDrawer
+          isOpen={isAutoDeleteDrawerOpen}
+          onClose={() => setIsAutoDeleteDrawerOpen(false)}
+          initialDate={parsedAutoDelete?.date}
+          initialTime={parsedAutoDelete?.time}
+          onConfirm={(_date, _time, isoString) => {
+            if (!subject || !user?.tg_id) return;
+            updateAutoDeleteMutation.mutate({
+              subject,
+              data: {
+                curator_tg_id: user.tg_id,
+                auto_delete_at: isoString,
+              },
+            });
+          }}
+          onClear={
+            currentMeta?.auto_delete_at
+              ? () => {
+                  if (!subject || !user?.tg_id) return;
+                  updateAutoDeleteMutation.mutate({
+                    subject,
+                    data: {
+                      curator_tg_id: user.tg_id,
+                      auto_delete_at: null,
+                    },
+                  });
+                }
+              : undefined
+          }
+        />
+      )}
     </>
   );
 }

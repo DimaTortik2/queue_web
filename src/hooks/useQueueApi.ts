@@ -9,6 +9,7 @@ import {
   AdvanceQueueDto,
   PauseQueueDto,
   ClearQueueDto,
+  UpdateAutoDeleteDto,
   SwapRequestCreateDto,
   SwapRequestRespondDto,
   SwapRequestListResponse,
@@ -375,6 +376,29 @@ export function useCuratorPauseMutation() {
     onError: (err: Error) => {
       haptic.error();
       toast.error(err.message || "Ошибка изменения статуса очереди");
+    },
+  });
+}
+
+export function useUpdateAutoDeleteMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ subject, data }: { subject: string; data: UpdateAutoDeleteDto }) =>
+      api.updateAutoDelete(subject, data),
+    onSuccess: (_, { subject, data }) => {
+      haptic.success();
+      toast.success(
+        data.auto_delete_at
+          ? "Время удаления очереди обновлено"
+          : "Автоудаление очереди отключено"
+      );
+      queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
+    },
+    onError: (err: Error) => {
+      haptic.error();
+      toast.error(err.message || "Ошибка обновления времени удаления");
     },
   });
 }

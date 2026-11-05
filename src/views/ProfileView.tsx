@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   PencilSimple,
@@ -36,6 +36,18 @@ export function ProfileView() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+
+  const colorInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCustomTileClick = () => {
+    if (accentMode !== 'custom') {
+      haptic.selection();
+      setAccentMode('custom');
+    } else {
+      haptic.selection();
+      colorInputRef.current?.click();
+    }
+  };
 
   const handleStartEditName = () => {
     haptic.selection();
@@ -194,57 +206,53 @@ export function ProfileView() {
                 haptic.selection();
                 setAccentMode('default');
               }}
-              className={`flex items-center justify-center gap-2.5 p-3.5 rounded-xl text-xs font-semibold transition-all border-0 outline-none ${
+              style={{
+                borderBottomColor:
+                  accentMode === 'default'
+                    ? DEFAULT_ACCENT_HEX
+                    : `${DEFAULT_ACCENT_HEX}50`,
+                backgroundColor:
+                  accentMode === 'default' ? `${DEFAULT_ACCENT_HEX}20` : undefined,
+              }}
+              className={`flex items-center justify-center p-3.5 rounded-xl text-xs font-semibold transition-all border-0 border-b-4 outline-none select-none active:scale-[0.98] ${
                 accentMode === 'default'
-                  ? 'bg-primary/15 text-foreground'
+                  ? 'text-foreground font-bold shadow-sm'
                   : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
               }`}
             >
-              <div
-                className="w-4 h-4 rounded-full shrink-0 border border-black/10 dark:border-white/10"
-                style={{ backgroundColor: DEFAULT_ACCENT_HEX }}
-              />
               <span>По умолчанию</span>
             </button>
 
             {/* Custom user color */}
-            <div
-              onClick={() => {
-                if (accentMode !== 'custom') {
-                  haptic.selection();
-                  setAccentMode('custom');
-                }
-              }}
+            <button
+              type="button"
+              onClick={handleCustomTileClick}
               style={{
+                borderBottomColor:
+                  accentMode === 'custom'
+                    ? customColor
+                    : `${customColor}70`,
                 backgroundColor:
-                  accentMode === 'custom' ? `${customColor}24` : undefined,
+                  accentMode === 'custom' ? `${customColor}20` : undefined,
               }}
-              className={`relative flex items-center justify-center gap-2.5 p-3.5 rounded-xl text-xs font-semibold transition-all border-0 outline-none cursor-pointer ${
+              className={`relative flex items-center justify-center p-3.5 rounded-xl text-xs font-semibold transition-all border-0 border-b-4 outline-none select-none cursor-pointer active:scale-[0.98] ${
                 accentMode === 'custom'
-                  ? 'text-foreground'
+                  ? 'text-foreground font-bold shadow-sm'
                   : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
               }`}
             >
-              <label
-                className="relative cursor-pointer shrink-0 flex items-center"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="color"
-                  value={customColor}
-                  onChange={(e) => {
-                    setCustomColor(e.target.value);
-                  }}
-                  className="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10"
-                />
-                <div
-                  className="w-4 h-4 rounded-full border border-black/20 dark:border-white/20 shadow-sm"
-                  style={{ backgroundColor: customColor }}
-                  title="Выбрать свой цвет"
-                />
-              </label>
-              <span className="font-mono text-xs uppercase">{customColor}</span>
-            </div>
+              <input
+                ref={colorInputRef}
+                type="color"
+                value={customColor}
+                onChange={(e) => {
+                  setCustomColor(e.target.value);
+                }}
+                className="sr-only"
+                tabIndex={-1}
+              />
+              <span className="font-mono text-xs uppercase tracking-wider">{customColor}</span>
+            </button>
           </div>
         </div>
 

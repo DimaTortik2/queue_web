@@ -19,6 +19,7 @@ import {
   AdvanceQueueDto,
   PauseQueueDto,
   ClearQueueDto,
+  UpdateAutoDeleteDto,
   SwapRequestInfo,
   SwapRequestListResponse,
   SwapRequestCreateDto,
@@ -181,6 +182,12 @@ export const api = {
 
   pauseQueue: (subject: string, data: PauseQueueDto) =>
     request<{ status: string; data: unknown }>(`/queue/${encodeURIComponent(subject)}/pause`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateAutoDelete: (subject: string, data: UpdateAutoDeleteDto) =>
+    request<{ status: string; data: unknown }>(`/queue/${encodeURIComponent(subject)}/auto-delete`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
