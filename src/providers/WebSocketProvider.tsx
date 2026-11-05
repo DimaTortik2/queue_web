@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { wsService } from "@/services/ws";
 import { useUserStore } from "@/store/userStore";
 import { useNotificationStore } from "@/store/notificationStore";
+import { usePreferencesStore } from "@/store/preferencesStore";
 import { haptic } from "@/lib/telegram";
 import { queueKeys } from "@/hooks/useQueueApi";
 import { UserWsMessage, RoomWsMessage } from "@/types";
@@ -31,10 +32,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const unsubscribe = wsService.onUserEvent((msg: UserWsMessage) => {
       switch (msg.event) {
-        case "incoming_swap_request":
+        case "incoming_swap_request": {
           haptic.warning();
           toast.info(msg.message || "Вам предложен обмен местами", { id: "incoming_swap" });
-          if (msg.data) {
+          const { disableSwapPopups } = usePreferencesStore.getState();
+          if (msg.data && !disableSwapPopups) {
             setActiveSwapProposal(msg.data);
           }
           if (msg.subject) {
@@ -42,8 +44,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               queryKey: queueKeys.incomingSwaps(msg.subject, user.tg_id),
             });
           }
+          queryClient.invalidateQueries({
+            queryKey: queueKeys.incomingSwaps("all", user.tg_id),
+          });
           queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
           break;
+        }
 
         case "swap_accepted":
           haptic.success();

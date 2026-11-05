@@ -57,6 +57,7 @@ interface PreferencesState {
   customColor: string;
   pinnedSubjects: string[];
   hapticsEnabled: boolean;
+  disableSwapPopups: boolean;
   setTheme: (theme: ThemeMode) => void;
   setAccentMode: (mode: AccentMode) => void;
   setCustomColor: (hex: string) => void;
@@ -65,6 +66,8 @@ interface PreferencesState {
   isPinned: (subject: string) => boolean;
   toggleHaptics: () => void;
   setHapticsEnabled: (enabled: boolean) => void;
+  toggleDisableSwapPopups: () => void;
+  setDisableSwapPopups: (disabled: boolean) => void;
   resetPreferences: () => void;
 }
 
@@ -76,6 +79,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       customColor: DEFAULT_ACCENT_HEX,
       pinnedSubjects: [],
       hapticsEnabled: true,
+      disableSwapPopups: false,
 
       setTheme: (theme: ThemeMode) => {
         set({ theme });
@@ -119,6 +123,14 @@ export const usePreferencesStore = create<PreferencesState>()(
         set({ hapticsEnabled });
       },
 
+      toggleDisableSwapPopups: () => {
+        set({ disableSwapPopups: !get().disableSwapPopups });
+      },
+
+      setDisableSwapPopups: (disableSwapPopups: boolean) => {
+        set({ disableSwapPopups });
+      },
+
       resetPreferences: () => {
         set({
           theme: "system",
@@ -126,6 +138,7 @@ export const usePreferencesStore = create<PreferencesState>()(
           customColor: DEFAULT_ACCENT_HEX,
           pinnedSubjects: [],
           hapticsEnabled: true,
+          disableSwapPopups: false,
         });
         applyTheme("system");
         applyAccentColor("default", DEFAULT_ACCENT_HEX);

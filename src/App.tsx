@@ -14,6 +14,7 @@ import { useNotificationStore } from "@/store/notificationStore";
 import { usePreferencesStore, applyTheme, applyAccentColor } from "@/store/preferencesStore";
 import { WebSocketProvider } from "@/providers/WebSocketProvider";
 import { useTelegramNavigation } from "@/hooks/useTelegramNavigation";
+import { useIncomingSwaps } from "@/hooks/useQueueApi";
 import { DashboardView } from "@/views/DashboardView";
 import { RequestsView } from "@/views/RequestsView";
 import { ProfileView } from "@/views/ProfileView";
@@ -82,8 +83,20 @@ function NavigationBar() {
 
 function AppContent() {
   useTelegramNavigation();
-  const { activeSwapProposal, setActiveSwapProposal } = useNotificationStore();
+  const { activeSwapProposal, setActiveSwapProposal, setPendingIncomingCount } = useNotificationStore();
   const { user, isLoading } = useUserStore();
+  const { disableSwapPopups } = usePreferencesStore();
+
+  const { data: incomingSwapsData } = useIncomingSwaps('all', user?.tg_id);
+
+  useEffect(() => {
+    if (incomingSwapsData?.requests) {
+      const pending = incomingSwapsData.requests.filter(
+        (r) => !r.status || r.status === 'pending'
+      ).length;
+      setPendingIncomingCount(pending);
+    }
+  }, [incomingSwapsData, setPendingIncomingCount]);
 
   if (isLoading) {
     return (
@@ -125,7 +138,7 @@ function AppContent() {
       {/* Real-time incoming swap push drawer */}
       <SwapRespondDrawer
         request={activeSwapProposal}
-        isOpen={activeSwapProposal !== null}
+        isOpen={!disableSwapPopups && activeSwapProposal !== null}
         onClose={() => setActiveSwapProposal(null)}
       />
 

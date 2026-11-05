@@ -8,7 +8,7 @@ import {
   Moon,
   Desktop,
   Vibrate,
-  ArrowsClockwise,
+  ArrowsLeftRight,
 } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import {
@@ -30,7 +30,8 @@ export function ProfileView() {
     setCustomColor,
     hapticsEnabled,
     toggleHaptics,
-    resetPreferences,
+    disableSwapPopups,
+    toggleDisableSwapPopups,
   } = usePreferencesStore();
 
   const [isEditingName, setIsEditingName] = useState(false);
@@ -256,10 +257,10 @@ export function ProfileView() {
         </div>
 
         {/* Sub-block 3: Haptics Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Vibrate size={20} className="text-muted-foreground" />
-            <div className="flex flex-col">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Vibrate size={20} className="text-muted-foreground shrink-0" />
+            <div className="flex flex-col min-w-0 flex-1">
               <span className="text-xs font-semibold text-foreground">
                 Виброотклик
               </span>
@@ -269,11 +270,14 @@ export function ProfileView() {
             </div>
           </div>
           <button
+            type="button"
+            role="switch"
+            aria-checked={hapticsEnabled}
             onClick={() => {
               toggleHaptics();
               if (!hapticsEnabled) haptic.success();
             }}
-            className={`w-12 h-7 rounded-full transition-colors relative ${
+            className={`w-12 h-7 rounded-full transition-colors relative shrink-0 ${
               hapticsEnabled ? 'bg-primary' : 'bg-secondary'
             }`}
           >
@@ -287,24 +291,40 @@ export function ProfileView() {
           </button>
         </div>
 
-        {/* Sub-block 4: Reset Preferences */}
-        <div className="flex items-center justify-between pt-0.5">
-          <span className="text-xs text-muted-foreground font-medium">
-            Сброс настроек
-          </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-xs text-destructive hover:bg-destructive/10 rounded-xl h-8 font-semibold"
+        {/* Sub-block 4: Disable Swap Popups Toggle */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+            <ArrowsLeftRight size={20} className="text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-xs font-semibold text-foreground">
+                Отключить всплывающее окно обмена
+              </span>
+              <span className="text-[11px] text-muted-foreground leading-snug">
+                Предложения об обмене местами не будут всплывать, перекрывая экран, а будут просто ждать в соответствующей вкладке
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={disableSwapPopups}
             onClick={() => {
-              haptic.warning();
-              resetPreferences();
-              toast.info('Настройки сброшены');
+              toggleDisableSwapPopups();
+              if (!disableSwapPopups) haptic.success();
+              else haptic.selection();
             }}
+            className={`w-12 h-7 rounded-full transition-colors relative tap-press active:scale-95 shrink-0 ${
+              disableSwapPopups ? 'bg-primary' : 'bg-secondary'
+            }`}
           >
-            <ArrowsClockwise size={14} className="mr-1" />
-            Сбросить
-          </Button>
+            <div
+              className={`w-5 h-5 rounded-full shadow-sm transition-transform duration-150 absolute top-1 border border-black/15 dark:border-white/15 ${
+                disableSwapPopups
+                  ? 'left-6 bg-primary-foreground'
+                  : 'left-1 bg-foreground/70'
+              }`}
+            />
+          </button>
         </div>
       </div>
     </div>
