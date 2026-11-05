@@ -24,9 +24,30 @@ class WebSocketClient {
   private status: ConnectionStatus = "disconnected";
 
   private getWsUrl(path: string): string {
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+    // 1. Explicit WS Base URL if configured
+    const wsBase = import.meta.env.VITE_WS_BASE_URL;
+    if (wsBase) {
+      return `${wsBase.replace(/\/+$/, "")}${cleanPath}`;
+    }
+
+    // 2. Derive from API Base URL if configured
+    const apiBase = import.meta.env.VITE_API_BASE_URL;
+    if (apiBase) {
+      try {
+        const url = new URL(apiBase, window.location.href);
+        const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+        return `${wsProtocol}//${url.host}${cleanPath}`;
+      } catch {
+        // Fallback to window.location if parsing fails
+      }
+    }
+
+    // 3. Fallback to same-origin (dev proxy or same-host deployment)
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    return `${protocol}//${host}${path}`;
+    return `${protocol}//${host}${cleanPath}`;
   }
 
   private setStatus(newStatus: ConnectionStatus) {
