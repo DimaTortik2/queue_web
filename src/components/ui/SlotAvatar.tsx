@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 
 interface SlotAvatarProps {
   photoUrl?: string | null;
@@ -8,7 +8,7 @@ interface SlotAvatarProps {
   className?: string;
 }
 
-export function SlotAvatar({
+export const SlotAvatar = memo(function SlotAvatar({
   photoUrl,
   name,
   isMe = false,
@@ -24,6 +24,8 @@ export function SlotAvatar({
       <img
         src={photoUrl}
         alt=""
+        loading="lazy"
+        decoding="async"
         onError={() => setImgError(true)}
         style={{ width: size, height: size }}
         className={`rounded-full object-cover shrink-0 select-none pointer-events-none ${className}`}
@@ -43,4 +45,4 @@ export function SlotAvatar({
       {letter}
     </div>
   );
-}
+});

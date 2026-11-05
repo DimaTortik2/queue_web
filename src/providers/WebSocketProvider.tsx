@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect } from "react";
+import React, { createContext, useContext, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { wsService } from "@/services/ws";
@@ -159,7 +159,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user?.tg_id, queryClient, setUrgentAlert, setActiveSwapProposal]);
 
   // ──────────────────── Room Subscription Helper ────────────────────
-  const subscribeToRoom = (subject: string) => {
+  const subscribeToRoom = useCallback((subject: string) => {
     wsService.connectRoom(subject);
 
     const unsubscribe = wsService.onRoomEvent((msg: RoomWsMessage) => {
@@ -186,7 +186,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       unsubscribe();
       wsService.disconnectRoom();
     };
-  };
+  }, [queryClient, user?.tg_id]);
 
   return (
     <WebSocketContext.Provider value={{ subscribeToRoom }}>

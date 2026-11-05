@@ -7,6 +7,7 @@ const Drawer = ({
   noBodyStyles = true,
   repositionInputs = false,
   disablePreventScroll = false,
+  handleOnly = false,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root
@@ -15,21 +16,38 @@ const Drawer = ({
     noBodyStyles={noBodyStyles}
     repositionInputs={repositionInputs}
     disablePreventScroll={disablePreventScroll}
+    handleOnly={handleOnly}
     {...props}
   />
 );
 Drawer.displayName = "Drawer";
 
 const DrawerNestedRoot = ({
+  handleOnly = false,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) => (
-  <DrawerPrimitive.NestedRoot {...props} />
+  <DrawerPrimitive.NestedRoot handleOnly={handleOnly} {...props} />
 );
 DrawerNestedRoot.displayName = "DrawerNestedRoot";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
 const DrawerPortal = DrawerPrimitive.Portal;
 const DrawerClose = DrawerPrimitive.Close;
+
+const DrawerHandle = React.forwardRef<
+  React.ElementRef<typeof DrawerPrimitive.Handle>,
+  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Handle>
+>(({ className, ...props }, ref) => (
+  <DrawerPrimitive.Handle
+    ref={ref}
+    className={cn(
+      "mx-auto mt-3 h-1.5 w-11 rounded-full bg-muted-foreground/30 shrink-0 cursor-grab active:cursor-grabbing",
+      className
+    )}
+    {...props}
+  />
+));
+DrawerHandle.displayName = "DrawerHandle";
 
 const DrawerOverlay = React.forwardRef<
   React.ElementRef<typeof DrawerPrimitive.Overlay>,
@@ -57,7 +75,7 @@ const DrawerContent = React.forwardRef<
       )}
       {...props}
     >
-      <div className="mx-auto mt-3 h-1.5 w-11 rounded-full bg-muted-foreground/30 shrink-0" />
+      <DrawerHandle />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
@@ -105,6 +123,7 @@ export {
   DrawerOverlay,
   DrawerTrigger,
   DrawerClose,
+  DrawerHandle,
   DrawerContent,
   DrawerHeader,
   DrawerFooter,

@@ -147,11 +147,14 @@ export default function App() {
   const { theme, accentMode, customColor } = usePreferencesStore();
 
   useEffect(() => {
-    applyTheme(theme);
-    applyAccentColor(accentMode, customColor);
     initTelegramApp();
     initUser();
-  }, [initUser, theme, accentMode, customColor]);
+  }, [initUser]);
+
+  useEffect(() => {
+    applyTheme(theme);
+    applyAccentColor(accentMode, customColor);
+  }, [theme, accentMode, customColor]);
 
   return (
     <QueryClientProvider client={queryClient}>

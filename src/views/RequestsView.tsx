@@ -215,7 +215,7 @@ export function RequestsView() {
               message="Не удалось загрузить входящие предложения"
               onRetry={() => refetchIncoming()}
             />
-          ) : isLoadingIncoming ? (
+          ) : isLoadingIncoming && !incomingData ? (
             <div className="flex flex-col gap-4">
               {Array.from({ length: 2 }).map((_, i) => (
                 <div
@@ -344,7 +344,7 @@ export function RequestsView() {
             message="Не удалось загрузить отправленные запросы"
             onRetry={() => refetchOutgoing()}
           />
-        ) : isLoadingOutgoing ? (
+        ) : isLoadingOutgoing && !outgoingData ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 2 }).map((_, i) => (
               <div

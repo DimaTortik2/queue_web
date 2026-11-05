@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { toast } from 'sonner';
+import { QueueMetaInfo, QueueUserInfo } from '@/types';
 import {
   Trash,
   X,
@@ -19,7 +20,6 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { RetryBanner } from '@/components/ui/retry-banner';
 import { haptic } from '@/lib/telegram';
 import { useUserStore } from '@/store/userStore';
@@ -39,11 +39,72 @@ import { SlotAvatar } from '@/components/ui/SlotAvatar';
 import { formatAutoDeleteTime, parseMskIso } from '@/lib/dateUtils';
 import { GoogleCalendarTimeDrawer } from '@/components/queue/GoogleCalendarTimeDrawer';
 
+// ── Memoized Slot Button to avoid re-rendering all 30 on every state change ──
+interface SlotButtonProps {
+  pos: number;
+  isFree: boolean;
+  isMe: boolean;
+  name: string | null;
+  tgId: number | null;
+  photoUrl: string | null;
+  userName: string | undefined;
+  onSlotClick: (pos: number, isFree: boolean, tgId: number | null, name: string | null) => void;
+}
+
+const SlotButton = memo(function SlotButton({
+  pos,
+  isFree,
+  isMe,
+  name,
+  tgId,
+  photoUrl,
+  userName,
+  onSlotClick,
+}: SlotButtonProps) {
+  let bgClass = 'bg-secondary text-muted-foreground';
+  if (isMe) {
+    bgClass = 'bg-primary text-primary-foreground font-semibold';
+  } else if (!isFree) {
+    bgClass = 'bg-card text-foreground font-medium';
+  }
+
+  return (
+    <button
+      onClick={() => onSlotClick(pos, isFree, tgId, name)}
+      className={`flex flex-col items-center justify-between p-2 rounded-2xl h-[66px] active:scale-95 text-center select-none transition-colors duration-100 ${bgClass}`}
+    >
+      <span className="text-xs font-bold leading-none">
+        {pos}
+      </span>
+
+      {!isFree ? (
+        <SlotAvatar
+          photoUrl={photoUrl}
+          name={isMe ? userName : name}
+          isMe={isMe}
+          className={isMe ? '!bg-white/20 !text-white' : ''}
+        />
+      ) : (
+        <div className="w-5 h-5 shrink-0" />
+      )}
+
+      <span className="text-[10px] truncate max-w-full opacity-85 font-medium leading-tight">
+        {isMe
+          ? 'Вы'
+          : isFree
+            ? 'Свободно'
+            : name?.split(' ')[0]}
+      </span>
+    </button>
+  );
+});
+
 interface QueueSlotsModalProps {
   subject: string | null;
   isOpen: boolean;
   onClose: () => void;
   onRequestSwap: (targetPos: number, candidateName: string) => void;
+  initialMeta?: QueueMetaInfo;
 }
 
 export function QueueSlotsModal({
@@ -51,6 +112,7 @@ export function QueueSlotsModal({
   isOpen,
   onClose,
   onRequestSwap,
+  initialMeta,
 }: QueueSlotsModalProps) {
   const { user } = useUserStore();
   const [selectedSlotForKick, setSelectedSlotForKick] = useState<{
@@ -63,29 +125,63 @@ export function QueueSlotsModal({
   const [deleteInputText, setDeleteInputText] = useState('');
   const [isDirectSwapOpen, setIsDirectSwapOpen] = useState(false);
 
-  // Real-time WebSocket connection
-  useRoomSubscription(isOpen && subject ? subject : null);
+  // Defer WebSocket connection until after the drawer open animation settles (~300ms)
+  const [wsReady, setWsReady] = useState(false);
+  useEffect(() => {
+    if (!isOpen) {
+      setWsReady(false);
+      return;
+    }
+    const id = setTimeout(() => setWsReady(true), 320);
+    return () => clearTimeout(id);
+  }, [isOpen]);
+
+  useRoomSubscription(wsReady && subject ? subject : null);
 
   const { data: queuesData } = useQueuesList();
-  const currentMeta = queuesData?.queues?.find((q) => q.subject === subject);
+  const foundQueue = queuesData?.queues?.find((q) => q.subject === subject);
+  const userKnownPos =
+    initialMeta?.my_position !== undefined && initialMeta?.my_position !== null
+      ? initialMeta.my_position
+      : (foundQueue?.my_position ?? null);
+
+  const currentMeta = foundQueue
+    ? {
+        ...initialMeta,
+        ...foundQueue,
+        my_position: userKnownPos,
+      }
+    : initialMeta;
 
   const {
     data: queueData,
-    isLoading,
     isError: isErrorQueue,
     refetch: refetchQueue,
-  } = useQueueDetail(subject);
-  const { data: myPosData } = useMyPosition(subject, user?.tg_id);
+  } = useQueueDetail(isOpen ? subject : null);
+  const { data: myPosData } = useMyPosition(isOpen ? subject : null, user?.tg_id);
 
-  // Auto-close modal if queue was deleted in real-time
+  // Auto-close modal ONLY if queue existed while open and was subsequently deleted
+  const hasLoadedInitialMeta = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && currentMeta) {
+      hasLoadedInitialMeta.current = true;
+    }
+    if (!isOpen) {
+      hasLoadedInitialMeta.current = false;
+    }
+  }, [isOpen, currentMeta]);
+
   useEffect(() => {
     if (
       isOpen &&
       subject &&
+      hasLoadedInitialMeta.current &&
       queuesData?.queues &&
       queuesData.queues.length > 0 &&
       !currentMeta
     ) {
+      toast.info('Очередь была удалена');
       onClose();
     }
   }, [isOpen, subject, queuesData, currentMeta, onClose]);
@@ -101,87 +197,91 @@ export function QueueSlotsModal({
   const isCreator = user?.tg_id
     ? currentMeta?.created_by_tg_id === user.tg_id
     : false;
-  const myPosition = myPosData?.position || null;
-  const totalPositions = queueData?.total_positions || 30;
+  const myPosition = myPosData?.position ?? userKnownPos;
+  const totalPositions =
+    queueData?.total_positions || currentMeta?.total_positions || 30;
 
   // First available free slot
   const firstFreeSlot = queueData?.queue?.find((s) => s.is_free)?.position || 1;
 
-  const handleSlotClick = (
-    slotPos: number,
-    isFree: boolean,
-    slotUserId?: number | null,
-    name?: string | null,
-  ) => {
-    haptic.selection();
+  const handleSlotClick = useCallback(
+    (
+      slotPos: number,
+      isFree: boolean,
+      slotUserId?: number | null,
+      name?: string | null,
+    ) => {
+      haptic.selection();
 
-    // 1. Join free slot
-    if (isFree && !myPosition && user?.tg_id && subject) {
-      joinMutation.mutate({
-        subject,
-        data: { tg_id: user.tg_id, position: slotPos },
-      });
-      return;
-    }
+      // 1. Join free slot
+      if (isFree && !myPosition && user?.tg_id && subject) {
+        joinMutation.mutate({
+          subject,
+          data: { tg_id: user.tg_id, position: slotPos },
+        });
+        return;
+      }
 
-    // 2. Click on free slot while enrolled
-    if (isFree && myPosition) {
-      haptic.warning();
-      toast.info(
-        `Вы уже записаны на место ${myPosition}. Сначала освободите его, чтобы сменить.`,
-      );
-      return;
-    }
+      // 2. Click on free slot while enrolled
+      if (isFree && myPosition) {
+        haptic.warning();
+        toast.info(
+          `Вы уже записаны на место ${myPosition}. Сначала освободите его, чтобы сменить.`,
+        );
+        return;
+      }
 
-    // 3. Click on own slot
-    if (!isFree && slotUserId === user?.tg_id) {
-      haptic.light();
-      toast.info(`Это ваше место ${slotPos}`);
-      return;
-    }
+      // 3. Click on own slot
+      if (!isFree && slotUserId === user?.tg_id) {
+        haptic.light();
+        toast.info(`Это ваше место ${slotPos}`);
+        return;
+      }
 
-    // 4. Creator kick
-    if (isCreator && !isFree && slotUserId && slotUserId !== user?.tg_id) {
-      setSelectedSlotForKick({
-        pos: slotPos,
-        tgId: slotUserId,
-        name: name || `ID ${slotUserId}`,
-      });
-      return;
-    }
+      // 4. Creator kick
+      if (isCreator && !isFree && slotUserId && slotUserId !== user?.tg_id) {
+        setSelectedSlotForKick({
+          pos: slotPos,
+          tgId: slotUserId,
+          name: name || `ID ${slotUserId}`,
+        });
+        return;
+      }
 
-    // 5. Swap request
-    if (!isFree && myPosition && slotUserId && slotUserId !== user?.tg_id) {
-      onRequestSwap(slotPos, name || `Участник ${slotPos}`);
-      return;
-    }
+      // 5. Swap request
+      if (!isFree && myPosition && slotUserId && slotUserId !== user?.tg_id) {
+        onRequestSwap(slotPos, name || `Участник ${slotPos}`);
+        return;
+      }
 
-    // 6. Not enrolled
-    if (!isFree && !myPosition && !isCreator) {
-      haptic.warning();
-      toast.info('Займите свободное место, чтобы предлагать обмен');
-      return;
-    }
-  };
+      // 6. Not enrolled
+      if (!isFree && !myPosition && !isCreator) {
+        haptic.warning();
+        toast.info('Займите свободное место, чтобы предлагать обмен');
+        return;
+      }
+    },
+    [myPosition, user?.tg_id, subject, isCreator, joinMutation, onRequestSwap],
+  );
 
-  const handleQuickJoinFirst = () => {
+  const handleQuickJoinFirst = useCallback(() => {
     if (!subject || !user?.tg_id || myPosition) return;
     haptic.selection();
     joinMutation.mutate({
       subject,
       data: { tg_id: user.tg_id, position: firstFreeSlot },
     });
-  };
+  }, [subject, user?.tg_id, myPosition, joinMutation, firstFreeSlot]);
 
-  const handleLeave = () => {
+  const handleLeave = useCallback(() => {
     if (!subject || !user?.tg_id || !myPosition) return;
     leaveMutation.mutate({
       subject,
       data: { tg_id: user.tg_id, position: myPosition },
     });
-  };
+  }, [subject, user?.tg_id, myPosition, leaveMutation]);
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = useCallback(() => {
     if (!subject || !user?.tg_id) return;
     deleteMutation.mutate(
       { subject, curatorTgId: user.tg_id },
@@ -193,9 +293,9 @@ export function QueueSlotsModal({
         },
       },
     );
-  };
+  }, [subject, user?.tg_id, deleteMutation, onClose]);
 
-  const handleKickConfirm = () => {
+  const handleKickConfirm = useCallback(() => {
     if (!subject || !user?.tg_id || !selectedSlotForKick) return;
     kickMutation.mutate({
       subject,
@@ -205,7 +305,7 @@ export function QueueSlotsModal({
       },
     });
     setSelectedSlotForKick(null);
-  };
+  }, [subject, user?.tg_id, selectedSlotForKick, kickMutation]);
 
   const colonIdx = subject ? subject.indexOf(':') : -1;
   const subjectName =
@@ -219,22 +319,34 @@ export function QueueSlotsModal({
     currentMeta?.queue_type ||
     (subject && colonIdx !== -1 ? subject.slice(colonIdx + 1).trim() : null);
 
-  const slots = Array.from({ length: totalPositions }, (_, i) => {
-    const pos = i + 1;
-    const existing = queueData?.queue?.find((s) => s.position === pos);
-    const isFree = existing ? existing.is_free : true;
-    const isMe = !isFree && existing?.tg_id === user?.tg_id;
-    return {
-      pos,
-      isFree,
-      isMe,
-      name: existing?.name || null,
-      tgId: existing?.tg_id || null,
-      photoUrl: isMe
-        ? user?.photo_url || existing?.photo_url || null
-        : existing?.photo_url || null,
-    };
-  });
+  // Build a lookup Map once, then generate slots in O(n) instead of O(n×m)
+  const slots = useMemo(() => {
+    const queueMap = new Map<number, QueueUserInfo>();
+    if (queueData?.queue) {
+      for (const s of queueData.queue) {
+        queueMap.set(s.position, s);
+      }
+    }
+
+    return Array.from({ length: totalPositions }, (_, i) => {
+      const pos = i + 1;
+      const existing = queueMap.get(pos);
+      const isFree = existing ? existing.is_free : (myPosition !== pos);
+      const isMe = !isFree
+        ? (existing?.tg_id === user?.tg_id || myPosition === pos)
+        : (myPosition === pos);
+      return {
+        pos,
+        isFree: isMe ? false : isFree,
+        isMe,
+        name: isMe ? user?.name || existing?.name || null : existing?.name || null,
+        tgId: isMe ? user?.tg_id || existing?.tg_id || null : existing?.tg_id || null,
+        photoUrl: isMe
+          ? user?.photo_url || existing?.photo_url || null
+          : existing?.photo_url || null,
+      };
+    });
+  }, [totalPositions, queueData, user?.tg_id, user?.name, user?.photo_url, myPosition]);
 
   return (
     <>
@@ -271,7 +383,7 @@ export function QueueSlotsModal({
                 {queueType || ''}
               </span>
               <span className="text-xs text-muted-foreground font-medium shrink-0 whitespace-nowrap ml-auto">
-                Занято {queueData?.taken_positions || 0} из {totalPositions}
+                Занято {queueData?.taken_positions ?? currentMeta?.taken_positions ?? 0} из {totalPositions}
               </span>
             </div>
             {/* Auto Delete Badge / Button */}
@@ -283,7 +395,7 @@ export function QueueSlotsModal({
                     haptic.selection();
                     setIsAutoDeleteDrawerOpen(true);
                   }}
-                  className="flex items-center gap-1.5 mt-2 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all rounded-xl px-3 py-1.5 w-fit select-none"
+                  className="flex items-center gap-1.5 mt-2 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 active:scale-95 transition-colors rounded-xl px-3 py-1.5 w-fit select-none"
                   title="Нажмите, чтобы изменить или отключить автоудаление"
                 >
                   <Trash size={13} weight="bold" />
@@ -297,7 +409,7 @@ export function QueueSlotsModal({
                     haptic.selection();
                     setIsAutoDeleteDrawerOpen(true);
                   }}
-                  className="flex items-center gap-1.5 mt-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary hover:bg-secondary/80 active:scale-95 transition-all rounded-xl px-3 py-1.5 w-fit select-none"
+                  className="flex items-center gap-1.5 mt-2 text-xs font-medium text-muted-foreground hover:text-foreground bg-secondary hover:bg-secondary/80 active:scale-95 transition-colors rounded-xl px-3 py-1.5 w-fit select-none"
                   title="Указать время автоудаления очереди"
                 >
                   <Trash size={13} weight="bold" />
@@ -349,66 +461,22 @@ export function QueueSlotsModal({
                 message="Ошибка загрузки слотов"
                 onRetry={() => refetchQueue()}
               />
-            ) : isLoading ? (
-              <div className="grid grid-cols-5 gap-2.5 py-2">
-                {Array.from({ length: 20 }).map((_, i) => (
-                  <Skeleton key={i} className="h-14 rounded-2xl" />
-                ))}
-              </div>
             ) : (
               <div className="grid grid-cols-5 gap-2.5 pb-2 pt-1">
-                  {slots.map((slot) => {
-                    let bgClass =
-                      'bg-secondary text-muted-foreground hover:bg-secondary/80';
-                    if (slot.isMe) {
-                      bgClass =
-                        'bg-primary text-primary-foreground font-semibold';
-                    } else if (!slot.isFree) {
-                      bgClass =
-                        'bg-card text-foreground hover:bg-secondary font-medium';
-                    }
-
-                    return (
-                      <button
-                        key={slot.pos}
-                        onClick={() =>
-                          handleSlotClick(
-                            slot.pos,
-                            slot.isFree,
-                            slot.tgId,
-                            slot.name,
-                          )
-                        }
-                        className={`flex flex-col items-center justify-between p-2 rounded-2xl h-[66px] transition-all duration-150 tap-press active:scale-95 text-center select-none ${bgClass}`}
-                      >
-                        <span className="text-xs font-bold leading-none">
-                          {slot.pos}
-                        </span>
-
-                        {!slot.isFree ? (
-                          <SlotAvatar
-                            photoUrl={slot.photoUrl}
-                            name={slot.isMe ? user?.name : slot.name}
-                            isMe={slot.isMe}
-                            className={
-                              slot.isMe ? '!bg-white/20 !text-white' : ''
-                            }
-                          />
-                        ) : (
-                          <div className="w-5 h-5 shrink-0" />
-                        )}
-
-                        <span className="text-[10px] truncate max-w-full opacity-85 font-medium leading-tight">
-                          {slot.isMe
-                            ? 'Вы'
-                            : slot.isFree
-                              ? 'Свободно'
-                              : slot.name?.split(' ')[0]}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                {slots.map((slot) => (
+                  <SlotButton
+                    key={slot.pos}
+                    pos={slot.pos}
+                    isFree={slot.isFree}
+                    isMe={slot.isMe}
+                    name={slot.name}
+                    tgId={slot.tgId}
+                    photoUrl={slot.photoUrl}
+                    userName={user?.name}
+                    onSlotClick={handleSlotClick}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -422,10 +490,10 @@ export function QueueSlotsModal({
                   className="rounded-2xl h-11 text-xs font-semibold gap-1.5"
                   onClick={() => setIsDirectSwapOpen(true)}
                   disabled={
-                    !queueData?.taken_positions || queueData.taken_positions < 2
+                    (queueData?.taken_positions ?? currentMeta?.taken_positions ?? 0) < 2
                   }
                   disabledReason={
-                    !queueData?.taken_positions || queueData.taken_positions < 2
+                    (queueData?.taken_positions ?? currentMeta?.taken_positions ?? 0) < 2
                       ? 'Нужно минимум 2 участника для прямого обмена'
                       : undefined
                   }
@@ -486,111 +554,115 @@ export function QueueSlotsModal({
                 </Button>
               </DrawerClose>
             </div>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
 
-      {/* Separate Dedicated Delete Confirmation Drawer */}
-      <Drawer
-        open={isDeleteDrawerOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsDeleteDrawerOpen(false);
-            setDeleteInputText('');
-          }
-        }}
-      >
-        <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
-          <DrawerHeader className="px-6 pt-6 pb-2 text-center sm:text-left">
-            <DrawerTitle className="text-xl font-bold tracking-tight text-destructive">
-              Удаление очереди
-            </DrawerTitle>
-            <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1 text-left">
-              Очередь «{subject}» будет безвозвратно удалена, а все участники
-              потеряют свои места.
-            </DrawerDescription>
-          </DrawerHeader>
-
-          <div className="px-6 py-4 flex flex-col gap-3">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Для подтверждения введите слово «удалить»
-            </label>
-            <input
-              type="text"
-              placeholder="удалить"
-              value={deleteInputText}
-              onChange={(e) => setDeleteInputText(e.target.value)}
-              className="w-full bg-secondary rounded-2xl px-4 py-3.5 text-sm font-medium text-foreground focus:ring-2 focus:ring-destructive/30 border-0 outline-none"
-              autoFocus
-            />
-          </div>
-
-          <DrawerFooter className="px-6 pt-4 pb-12 mb-3 flex flex-col gap-3">
-            <Button
-              variant="destructive"
-              className="w-full rounded-2xl h-12 text-sm font-semibold"
-              onClick={handleDeleteConfirm}
-              disabled={
-                deleteInputText.trim().toLowerCase() !== 'удалить' ||
-                deleteMutation.isPending
-              }
-              disabledReason="Введите слово «удалить»"
-            >
-              {deleteMutation.isPending
-                ? 'Удаление...'
-                : 'Подтвердить удаление'}
-            </Button>
-            <DrawerClose asChild>
-              <Button
-                variant="secondary"
-                className="w-full rounded-2xl h-12 text-sm font-medium"
-              >
-                Отмена
-              </Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-
-      {/* Direct Curator Swap Drawer */}
-      <DirectSwapDrawer
-        subject={subject}
-        queueData={queueData}
-        isOpen={isDirectSwapOpen}
-        onClose={() => setIsDirectSwapOpen(false)}
-      />
-
-      {/* Auto-Delete Time Editor for Creator */}
-      {isCreator && (
-        <GoogleCalendarTimeDrawer
-          isOpen={isAutoDeleteDrawerOpen}
-          onClose={() => setIsAutoDeleteDrawerOpen(false)}
-          initialDate={parsedAutoDelete?.date}
-          initialTime={parsedAutoDelete?.time}
-          onConfirm={(_date, _time, isoString) => {
-            if (!subject || !user?.tg_id) return;
-            updateAutoDeleteMutation.mutate({
-              subject,
-              data: {
-                curator_tg_id: user.tg_id,
-                auto_delete_at: isoString,
-              },
-            });
-          }}
-          onClear={
-            currentMeta?.auto_delete_at
-              ? () => {
+            {/* Auto-Delete Time Editor for Creator */}
+            {isCreator && isAutoDeleteDrawerOpen && (
+              <GoogleCalendarTimeDrawer
+                isOpen={isAutoDeleteDrawerOpen}
+                onClose={() => setIsAutoDeleteDrawerOpen(false)}
+                initialDate={parsedAutoDelete?.date}
+                initialTime={parsedAutoDelete?.time}
+                onConfirm={(_date, _time, isoString) => {
                   if (!subject || !user?.tg_id) return;
                   updateAutoDeleteMutation.mutate({
                     subject,
                     data: {
                       curator_tg_id: user.tg_id,
-                      auto_delete_at: null,
+                      auto_delete_at: isoString,
                     },
                   });
+                }}
+                onClear={
+                  currentMeta?.auto_delete_at
+                    ? () => {
+                        if (!subject || !user?.tg_id) return;
+                        updateAutoDeleteMutation.mutate({
+                          subject,
+                          data: {
+                            curator_tg_id: user.tg_id,
+                            auto_delete_at: null,
+                          },
+                        });
+                      }
+                    : undefined
                 }
-              : undefined
-          }
+              />
+            )}
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Separate Dedicated Delete Confirmation Drawer */}
+      {isDeleteDrawerOpen && (
+        <Drawer
+          open={isDeleteDrawerOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsDeleteDrawerOpen(false);
+              setDeleteInputText('');
+            }
+          }}
+        >
+          <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
+            <DrawerHeader className="px-6 pt-6 pb-2 text-center sm:text-left">
+              <DrawerTitle className="text-xl font-bold tracking-tight text-destructive">
+                Удаление очереди
+              </DrawerTitle>
+              <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1 text-left">
+                Очередь «{subject}» будет безвозвратно удалена, а все участники
+                потеряют свои места.
+              </DrawerDescription>
+            </DrawerHeader>
+
+            <div className="px-6 py-4 flex flex-col gap-3">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Для подтверждения введите слово «удалить»
+              </label>
+              <input
+                type="text"
+                placeholder="удалить"
+                value={deleteInputText}
+                onChange={(e) => setDeleteInputText(e.target.value)}
+                className="w-full bg-secondary rounded-2xl px-4 py-3.5 text-sm font-medium text-foreground focus:ring-2 focus:ring-destructive/30 border-0 outline-none"
+                autoFocus
+              />
+            </div>
+
+            <DrawerFooter className="px-6 pt-4 pb-12 mb-3 flex flex-col gap-3">
+              <Button
+                variant="destructive"
+                className="w-full rounded-2xl h-12 text-sm font-semibold"
+                onClick={handleDeleteConfirm}
+                disabled={
+                  deleteInputText.trim().toLowerCase() !== 'удалить' ||
+                  deleteMutation.isPending
+                }
+                disabledReason="Введите слово «удалить»"
+              >
+                {deleteMutation.isPending
+                  ? 'Удаление...'
+                  : 'Подтвердить удаление'}
+              </Button>
+              <DrawerClose asChild>
+                <Button
+                  variant="secondary"
+                  className="w-full rounded-2xl h-12 text-sm font-medium"
+                >
+                  Отмена
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      )}
+
+      {/* Direct Curator Swap Drawer */}
+      {isDirectSwapOpen && (
+        <DirectSwapDrawer
+          subject={subject}
+          queueData={queueData}
+          isOpen={isDirectSwapOpen}
+          onClose={() => setIsDirectSwapOpen(false)}
         />
       )}
     </>

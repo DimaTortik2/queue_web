@@ -11,8 +11,6 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerFooter,
-  DrawerOverlay,
-  DrawerPortal,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { haptic } from '@/lib/telegram';
@@ -322,9 +320,7 @@ export function GoogleCalendarTimeDrawer({
 
   return (
     <DrawerNestedRoot open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerPortal>
-        <DrawerOverlay className="z-[70] bg-black/60" />
-        <DrawerContent className="z-[70] max-w-lg mx-auto rounded-t-3xl border-0 p-0 overflow-hidden bg-card">
+      <DrawerContent className="z-[70] max-w-lg mx-auto rounded-t-3xl border-0 p-0 overflow-hidden bg-card">
           {/* Header Row: "Очередь удалится:" [ 5 нояб. 2026 г. ] [ 21:00 ] */}
           <DrawerHeader className="px-6 pt-5 pb-2 text-left border-0">
             <span className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground">
@@ -604,7 +600,6 @@ export function GoogleCalendarTimeDrawer({
             </Button>
           </DrawerFooter>
         </DrawerContent>
-      </DrawerPortal>
     </DrawerNestedRoot>
   );
 }

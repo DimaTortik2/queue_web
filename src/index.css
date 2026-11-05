@@ -99,7 +99,7 @@
   padding-top: env(safe-area-inset-top, 16px);
 }
 
-/* Smooth Drawer transitions without flickering */
+/* Smooth Drawer transitions without flickering or stutter */
 [data-vaul-overlay] {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -125,7 +125,6 @@
 
 .native-page-enter {
   animation: nativePageEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity;
 }
 
 @keyframes listItemEnter {
@@ -141,7 +140,6 @@
 
 .animate-list-item {
   animation: listItemEnter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: transform, opacity;
 }
 
 /* Stagger delay helpers for list cascades */
@@ -151,11 +149,7 @@
 .stagger-4 { animation-delay: 100ms; }
 .stagger-5 { animation-delay: 125ms; }
 
-/* Native iOS-like tactile press with spring physics */
-.tap-press {
-  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.16s ease;
-  will-change: transform;
-}
+/* Native iOS-like tactile press */
 .tap-press:active {
   transform: scale(0.97);
 }

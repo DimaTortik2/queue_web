@@ -60,6 +60,8 @@ export function useQueuesList(params?: {
   return useQuery({
     queryKey: queueKeys.list(params),
     queryFn: () => api.listQueues(params),
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -131,6 +133,8 @@ export function useSubjectsList(search?: string) {
   return useQuery({
     queryKey: queueKeys.subjectsList(search),
     queryFn: () => api.getSubjects(search),
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -142,6 +146,8 @@ export function useIncomingSwaps(subject: string | null, tgId: number | undefine
         ? api.getIncomingSwapRequests(subject, tgId)
         : Promise.resolve({ requests: [], total: 0 }),
     enabled: !!subject && !!tgId,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 
@@ -153,6 +159,8 @@ export function useOutgoingSwaps(subject: string | null, tgId: number | undefine
         ? api.getOutgoingSwapRequests(subject, tgId)
         : Promise.resolve({ requests: [], total: 0 }),
     enabled: !!subject && !!tgId,
+    placeholderData: (prev) => prev,
+    staleTime: 1000 * 30,
   });
 }
 

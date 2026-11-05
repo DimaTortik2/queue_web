@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Plus, MagnifyingGlass } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
@@ -44,7 +44,6 @@ export function DashboardView() {
     refetch: refetchQueues,
   } = useQueuesList({
     search: search.trim() || undefined,
-    subject_name: selectedSubjectFilter || undefined,
   });
 
   const { data: userQueuesData } = useUserActiveQueues(user?.tg_id);
@@ -52,7 +51,37 @@ export function DashboardView() {
 
   const allQueues = queuesData?.queues || [];
   const userQueues = userQueuesData?.queues || [];
-  const subjects = subjectsData?.subject_list || [];
+
+  // Only subjects that currently have at least one active queue created
+  const activeSubjects = useMemo(() => {
+    const queues = allQueues;
+    const map = new Map<string, { id: number | string; name: string }>();
+    for (const q of queues) {
+      if (q.subject_name && !map.has(q.subject_name)) {
+        const matched = subjectsData?.subject_list?.find(
+          (s) => s.name === q.subject_name
+        );
+        map.set(q.subject_name, {
+          id: matched?.id ?? q.subject_name,
+          name: q.subject_name,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, 'ru')
+    );
+  }, [allQueues, subjectsData?.subject_list]);
+
+  // Auto-reset subject filter if the filtered subject no longer has any queues
+  useEffect(() => {
+    if (
+      selectedSubjectFilter &&
+      activeSubjects.length > 0 &&
+      !activeSubjects.some((s) => s.name === selectedSubjectFilter)
+    ) {
+      setSelectedSubjectFilter(null);
+    }
+  }, [selectedSubjectFilter, activeSubjects]);
 
   const userPositionsMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -64,29 +93,51 @@ export function DashboardView() {
     return map;
   }, [userQueues]);
 
+  // Instant filtering by subject without network refetch
+  const filteredQueues = useMemo(() => {
+    if (!selectedSubjectFilter) return allQueues;
+    return allQueues.filter((q) => q.subject_name === selectedSubjectFilter);
+  }, [allQueues, selectedSubjectFilter]);
+
   // Sort: pinned first, then by creator/active
   const displayedQueues = useMemo(() => {
-    return [...allQueues].sort((a, b) => {
+    return [...filteredQueues].sort((a, b) => {
       const aPinned = isPinned(a.subject);
       const bPinned = isPinned(b.subject);
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
       return 0;
     });
-  }, [allQueues, isPinned]);
+  }, [filteredQueues, isPinned]);
 
-  const handleOpenQueue = (subject: string) => {
+  const handleOpenQueue = useCallback((subject: string) => {
     haptic.selection();
     setSelectedQueueSubject(subject);
     setIsSlotsModalOpen(true);
-  };
+  }, []);
 
-  const handleRequestSwap = (targetPos: number, candidateName: string) => {
+  const handleRequestSwap = useCallback((targetPos: number, candidateName: string) => {
     haptic.selection();
     setSwapTargetPos(targetPos);
     setSwapTargetName(candidateName);
     setIsSwapDrawerOpen(true);
-  };
+  }, []);
+
+  const handleCloseSlotsModal = useCallback(() => setIsSlotsModalOpen(false), []);
+
+  const slotsModalInitialMeta = useMemo(() => {
+    const meta = displayedQueues.find(
+      (q) => q.subject === selectedQueueSubject
+    );
+    if (!meta) return undefined;
+    const pos = selectedQueueSubject
+      ? userPositionsMap.get(selectedQueueSubject)
+      : null;
+    return {
+      ...meta,
+      my_position: pos !== undefined ? pos : meta.my_position,
+    };
+  }, [displayedQueues, selectedQueueSubject, userPositionsMap]);
 
   return (
     <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none native-page-enter">
@@ -131,7 +182,7 @@ export function DashboardView() {
       </div>
 
       {/* Subject Filter Pills (Touch Carousel strictly within content bounds) */}
-      {subjects.length > 0 && (
+      {activeSubjects.length > 0 && (
         <div className="w-full overflow-hidden">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
             <button
@@ -147,7 +198,7 @@ export function DashboardView() {
             >
               Все
             </button>
-            {subjects.map((s) => {
+            {activeSubjects.map((s) => {
               const isSelected = selectedSubjectFilter === s.name;
               return (
                 <button
@@ -178,7 +229,7 @@ export function DashboardView() {
             message="Не удалось загрузить очереди"
             onRetry={() => refetchQueues()}
           />
-        ) : isLoadingQueues ? (
+        ) : isLoadingQueues && !queuesData ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
@@ -246,11 +297,9 @@ export function DashboardView() {
       {/* Interactive Slots Drawer */}
       <QueueSlotsModal
         subject={selectedQueueSubject}
+        initialMeta={slotsModalInitialMeta}
         isOpen={isSlotsModalOpen}
-        onClose={() => {
-          setIsSlotsModalOpen(false);
-          setSelectedQueueSubject(null);
-        }}
+        onClose={handleCloseSlotsModal}
         onRequestSwap={handleRequestSwap}
       />
 

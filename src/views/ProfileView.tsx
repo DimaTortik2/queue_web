@@ -40,13 +40,11 @@ export function ProfileView() {
   const colorInputRef = useRef<HTMLInputElement>(null);
 
   const handleCustomTileClick = () => {
+    haptic.selection();
     if (accentMode !== 'custom') {
-      haptic.selection();
       setAccentMode('custom');
-    } else {
-      haptic.selection();
-      colorInputRef.current?.click();
     }
+    colorInputRef.current?.click();
   };
 
   const handleStartEditName = () => {
@@ -224,6 +222,17 @@ export function ProfileView() {
             </button>
 
             {/* Custom user color */}
+            <input
+              ref={colorInputRef}
+              type="color"
+              value={customColor}
+              onChange={(e) => {
+                setCustomColor(e.target.value);
+              }}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+            />
             <button
               type="button"
               onClick={handleCustomTileClick}
@@ -241,16 +250,6 @@ export function ProfileView() {
                   : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
               }`}
             >
-              <input
-                ref={colorInputRef}
-                type="color"
-                value={customColor}
-                onChange={(e) => {
-                  setCustomColor(e.target.value);
-                }}
-                className="sr-only"
-                tabIndex={-1}
-              />
               <span className="font-mono text-xs uppercase tracking-wider">{customColor}</span>
             </button>
           </div>
