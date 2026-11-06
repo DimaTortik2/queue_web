@@ -6,6 +6,7 @@ import { useUserStore } from "@/store/userStore";
 import { useNotificationStore } from "@/store/notificationStore";
 import { usePreferencesStore } from "@/store/preferencesStore";
 import { haptic } from "@/lib/telegram";
+import { sound } from "@/lib/sound";
 import { queueKeys } from "@/hooks/useQueueApi";
 import { UserWsMessage, RoomWsMessage } from "@/types";
 
@@ -34,6 +35,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       switch (msg.event) {
         case "incoming_swap_request": {
           haptic.warning();
+          sound.notification();
           toast.info(msg.message || "Вам предложен обмен местами", { id: "incoming_swap" });
           const { disableSwapPopups } = usePreferencesStore.getState();
           if (msg.data && !disableSwapPopups) {
@@ -53,6 +55,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "swap_accepted":
           haptic.success();
+          sound.success();
           toast.success(msg.message || "Ваш запрос на обмен принят", { id: "swap_accepted" });
           if (msg.subject) {
             queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
@@ -66,6 +69,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "swap_rejected":
           haptic.error();
+          sound.error();
           toast.info(msg.message || "Запрос на обмен отклонен", { id: "swap_rejected" });
           if (msg.subject) {
             queryClient.invalidateQueries({
@@ -88,6 +92,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "your_turn":
           haptic.heavy();
+          sound.turn();
           setUrgentAlert({
             type: "your_turn",
             subject: msg.subject,
@@ -99,6 +104,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "submission_completed":
           haptic.success();
+          sound.success();
           setUrgentAlert({
             type: "submission_completed",
             subject: msg.subject,
@@ -117,6 +123,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         case "kicked":
           haptic.error();
+          sound.error();
           setUrgentAlert({
             type: "kicked",
             subject: msg.subject,

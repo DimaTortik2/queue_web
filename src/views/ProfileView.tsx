@@ -8,6 +8,7 @@ import {
   Moon,
   Desktop,
   Vibrate,
+  SpeakerHigh,
   ArrowsLeftRight,
 } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
@@ -18,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { SlotAvatar } from '@/components/ui/SlotAvatar';
 import { haptic } from '@/lib/telegram';
+import { sound } from '@/lib/sound';
 
 export function ProfileView() {
   const { user, updateUserName } = useUserStore();
@@ -30,6 +32,8 @@ export function ProfileView() {
     setCustomColor,
     hapticsEnabled,
     toggleHaptics,
+    soundsEnabled,
+    toggleSounds,
     disableSwapPopups,
     toggleDisableSwapPopups,
   } = usePreferencesStore();
@@ -275,6 +279,7 @@ export function ProfileView() {
             aria-checked={hapticsEnabled}
             onClick={() => {
               toggleHaptics();
+              sound.switch();
               if (!hapticsEnabled) haptic.success();
             }}
             className={`w-12 h-7 rounded-full transition-colors relative shrink-0 ${
@@ -291,7 +296,60 @@ export function ProfileView() {
           </button>
         </div>
 
-        {/* Sub-block 4: Disable Swap Popups Toggle */}
+        {/* Sub-block 4: Sounds Toggle */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <SpeakerHigh size={20} className="text-muted-foreground shrink-0" />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-xs font-semibold text-foreground">
+                Звуковые эффекты
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Звуки уведомлений и действий в приложении
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {soundsEnabled && (
+              <button
+                type="button"
+                onClick={() => sound.turn()}
+                className="text-[11px] font-semibold text-primary px-2 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 active:scale-95 transition-all"
+                title="Прослушать пример звука"
+              >
+                Тест
+              </button>
+            )}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={soundsEnabled}
+              onClick={() => {
+                const willEnable = !soundsEnabled;
+                toggleSounds();
+                if (willEnable) {
+                  haptic.success();
+                  sound.success();
+                } else {
+                  sound.switch();
+                }
+              }}
+              className={`w-12 h-7 rounded-full transition-colors relative shrink-0 ${
+                soundsEnabled ? 'bg-primary' : 'bg-secondary'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full shadow-sm transition-transform duration-150 absolute top-1 border border-black/15 dark:border-white/15 ${
+                  soundsEnabled
+                    ? 'left-6 bg-primary-foreground'
+                    : 'left-1 bg-foreground/70'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Sub-block 5: Disable Swap Popups Toggle */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
             <ArrowsLeftRight size={20} className="text-muted-foreground shrink-0 mt-0.5 sm:mt-0" />
@@ -310,6 +368,7 @@ export function ProfileView() {
             aria-checked={disableSwapPopups}
             onClick={() => {
               toggleDisableSwapPopups();
+              sound.switch();
               if (!disableSwapPopups) haptic.success();
               else haptic.selection();
             }}

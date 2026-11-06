@@ -54,7 +54,9 @@ function NavigationBar() {
           <Link
             key={item.path}
             to={item.path}
-            onClick={() => haptic.selection()}
+            onClick={() => {
+              haptic.selection();
+            }}
             className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 rounded-full gap-0.5 transition-all duration-200 tap-press active:scale-95 relative ${
               isActive
                 ? "bg-secondary text-foreground font-semibold shadow-sm"

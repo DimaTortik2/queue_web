@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "@/lib/utils";
+import { sound } from "@/lib/sound";
 
 const Drawer = ({
   shouldScaleBackground = false,
@@ -8,26 +9,83 @@ const Drawer = ({
   repositionInputs = false,
   disablePreventScroll = false,
   handleOnly = false,
+  open,
+  onOpenChange,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
-  <DrawerPrimitive.Root
-    shouldScaleBackground={shouldScaleBackground}
-    preventScrollRestoration={false}
-    noBodyStyles={noBodyStyles}
-    repositionInputs={repositionInputs}
-    disablePreventScroll={disablePreventScroll}
-    handleOnly={handleOnly}
-    {...props}
-  />
-);
+}: React.ComponentProps<typeof DrawerPrimitive.Root>) => {
+  const prevOpenRef = React.useRef<boolean | undefined>(false);
+
+  React.useEffect(() => {
+    if (open === true && !prevOpenRef.current) {
+      sound.drawerOpen();
+    }
+    prevOpenRef.current = open;
+  }, [open]);
+
+  const handleOpenChange = React.useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) {
+        sound.drawerOpen();
+      } else {
+        sound.drawerClose();
+      }
+      onOpenChange?.(isOpen);
+    },
+    [onOpenChange]
+  );
+
+  return (
+    <DrawerPrimitive.Root
+      shouldScaleBackground={shouldScaleBackground}
+      preventScrollRestoration={false}
+      noBodyStyles={noBodyStyles}
+      repositionInputs={repositionInputs}
+      disablePreventScroll={disablePreventScroll}
+      handleOnly={handleOnly}
+      open={open}
+      onOpenChange={handleOpenChange}
+      {...props}
+    />
+  );
+};
 Drawer.displayName = "Drawer";
 
 const DrawerNestedRoot = ({
   handleOnly = false,
+  open,
+  onOpenChange,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) => (
-  <DrawerPrimitive.NestedRoot handleOnly={handleOnly} {...props} />
-);
+}: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) => {
+  const prevOpenRef = React.useRef<boolean | undefined>(false);
+
+  React.useEffect(() => {
+    if (open === true && !prevOpenRef.current) {
+      sound.drawerOpen();
+    }
+    prevOpenRef.current = open;
+  }, [open]);
+
+  const handleOpenChange = React.useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) {
+        sound.drawerOpen();
+      } else {
+        sound.drawerClose();
+      }
+      onOpenChange?.(isOpen);
+    },
+    [onOpenChange]
+  );
+
+  return (
+    <DrawerPrimitive.NestedRoot
+      handleOnly={handleOnly}
+      open={open}
+      onOpenChange={handleOpenChange}
+      {...props}
+    />
+  );
+};
 DrawerNestedRoot.displayName = "DrawerNestedRoot";
 
 const DrawerTrigger = DrawerPrimitive.Trigger;
