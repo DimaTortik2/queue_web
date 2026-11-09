@@ -3,10 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import {
-  ListNumbers,
   ArrowsLeftRight,
   User as UserIcon,
 } from "@phosphor-icons/react";
+import { QueueNavIcon } from "@/components/ui/QueueLogo";
 
 import { initTelegramApp, haptic } from "@/lib/telegram";
 import { useUserStore } from "@/store/userStore";
@@ -35,7 +35,7 @@ function NavigationBar() {
   const { pendingIncomingCount } = useNotificationStore();
 
   const navItems = [
-    { path: "/", label: "Очереди", icon: ListNumbers },
+    { path: "/", label: "Очереди", icon: QueueNavIcon },
     {
       path: "/requests",
       label: "Обмены",

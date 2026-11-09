@@ -82,7 +82,7 @@ export const usePreferencesStore = create<PreferencesState>()(
       customColor: DEFAULT_ACCENT_HEX,
       pinnedSubjects: [],
       hapticsEnabled: true,
-      soundsEnabled: true,
+      soundsEnabled: false,
       disableSwapPopups: false,
 
       setTheme: (theme: ThemeMode) => {
@@ -150,7 +150,7 @@ export const usePreferencesStore = create<PreferencesState>()(
           customColor: DEFAULT_ACCENT_HEX,
           pinnedSubjects: [],
           hapticsEnabled: true,
-          soundsEnabled: true,
+          soundsEnabled: false,
           disableSwapPopups: false,
         });
         applyTheme("system");
@@ -159,6 +159,14 @@ export const usePreferencesStore = create<PreferencesState>()(
     }),
     {
       name: "queue_preferences_storage",
+      version: 1,
+      migrate: (persistedState: unknown, version: number) => {
+        const state = (persistedState || {}) as Partial<PreferencesState>;
+        if (version < 1) {
+          state.soundsEnabled = false;
+        }
+        return state as PreferencesState;
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyTheme(state.theme);
@@ -193,6 +201,7 @@ export function applyAccentColor(mode: AccentMode = "default", customHex: string
     root.style.setProperty("--primary-foreground", "0 0% 100%");
     root.style.setProperty("--accent", isDark ? "262 50% 16%" : "262 83% 96%");
     root.style.setProperty("--accent-foreground", isDark ? "262 83% 75%" : "262 83% 50%");
+    root.style.setProperty("--logo-accent", DEFAULT_ACCENT_HEX);
   } else {
     const hex = customHex && customHex.startsWith("#") ? customHex : DEFAULT_ACCENT_HEX;
     const { h, s, l, isLight } = hexToHsl(hex);
@@ -211,5 +220,6 @@ export function applyAccentColor(mode: AccentMode = "default", customHex: string
     root.style.setProperty("--primary-foreground", isLight ? "0 0% 9%" : "0 0% 100%");
     root.style.setProperty("--accent", `${h} ${Math.min(s, 50)}% ${isDark ? "18%" : "95%"}`);
     root.style.setProperty("--accent-foreground", hsl);
+    root.style.setProperty("--logo-accent", hex);
   }
 }

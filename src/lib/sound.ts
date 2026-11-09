@@ -24,7 +24,7 @@ function canPlaySound(): boolean {
   try {
     return usePreferencesStore.getState().soundsEnabled;
   } catch {
-    return true;
+    return false;
   }
 }
 
