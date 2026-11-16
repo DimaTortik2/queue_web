@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { useDirectSwapMutation } from "@/hooks/useQueueApi";
+import { useUserStore } from "@/store/userStore";
 import { QueueResponse } from "@/types";
 
 interface DirectSwapDrawerProps {
@@ -26,6 +27,7 @@ export function DirectSwapDrawer({
   isOpen,
   onClose,
 }: DirectSwapDrawerProps) {
+  const { user } = useUserStore();
   const [pos1, setPos1] = useState<number | "">("");
   const [pos2, setPos2] = useState<number | "">("");
 
@@ -71,11 +73,14 @@ export function DirectSwapDrawer({
               className="w-full bg-secondary/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:bg-secondary/70 transition-all text-foreground"
             >
               <option value="">Выберите первое место</option>
-              {occupiedSlots.map((s) => (
-                <option key={s.position} value={s.position}>
-                  Место #{s.position}: {s.name || `ID ${s.tg_id}`}
-                </option>
-              ))}
+              {occupiedSlots.map((s) => {
+                const isMe = user?.tg_id && Number(s.tg_id) === Number(user.tg_id);
+                return (
+                  <option key={s.position} value={s.position}>
+                    Место #{s.position}: {s.name || `ID ${s.tg_id}`}{isMe ? " (Вы)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -87,11 +92,14 @@ export function DirectSwapDrawer({
               className="w-full bg-secondary/50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:bg-secondary/70 transition-all text-foreground"
             >
               <option value="">Выберите второе место</option>
-              {occupiedSlots.map((s) => (
-                <option key={s.position} value={s.position}>
-                  Место #{s.position}: {s.name || `ID ${s.tg_id}`}
-                </option>
-              ))}
+              {occupiedSlots.map((s) => {
+                const isMe = user?.tg_id && Number(s.tg_id) === Number(user.tg_id);
+                return (
+                  <option key={s.position} value={s.position}>
+                    Место #{s.position}: {s.name || `ID ${s.tg_id}`}{isMe ? " (Вы)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>

@@ -15,39 +15,49 @@ class WebSocketClient {
 
   private userPingInterval: ReturnType<typeof setInterval> | null = null;
   private roomPingInterval: ReturnType<typeof setInterval> | null = null;
+  private userReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private roomReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   private currentSubject: string | null = null;
   private currentTgId: number | null = null;
-
-  private isUserReconnecting = false;
-  private isRoomReconnecting = false;
   private status: ConnectionStatus = "disconnected";
 
   private getWsUrl(path: string): string {
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
 
+    let baseWs = "";
     // 1. Explicit WS Base URL if configured
     const wsBase = import.meta.env.VITE_WS_BASE_URL;
     if (wsBase) {
-      return `${wsBase.replace(/\/+$/, "")}${cleanPath}`;
-    }
-
-    // 2. Derive from API Base URL if configured
-    const apiBase = import.meta.env.VITE_API_BASE_URL;
-    if (apiBase) {
-      try {
-        const url = new URL(apiBase, window.location.href);
-        const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
-        return `${wsProtocol}//${url.host}${cleanPath}`;
-      } catch {
-        // Fallback to window.location if parsing fails
+      baseWs = wsBase.replace(/\/+$/, "");
+    } else {
+      // 2. Derive from API Base URL if configured
+      const apiBase = import.meta.env.VITE_API_BASE_URL;
+      if (apiBase) {
+        try {
+          const url = new URL(apiBase, window.location.href);
+          const wsProtocol = url.protocol === "https:" ? "wss:" : "ws:";
+          baseWs = `${wsProtocol}//${url.host}`;
+        } catch {
+          // Fallback to window.location
+        }
       }
     }
 
-    // 3. Fallback to same-origin (dev proxy or same-host deployment)
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    return `${protocol}//${host}${cleanPath}`;
+    // 3. Fallback to same-origin
+    if (!baseWs) {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      baseWs = `${protocol}//${window.location.host}`;
+    }
+
+    let fullUrl = `${baseWs}${cleanPath}`;
+
+    // Security check: if current page is on HTTPS, browsers block insecure ws://
+    if (window.location.protocol === "https:" && fullUrl.startsWith("ws://")) {
+      fullUrl = fullUrl.replace(/^ws:\/\//, "wss://");
+    }
+
+    return fullUrl;
   }
 
   private setStatus(newStatus: ConnectionStatus) {
@@ -72,25 +82,27 @@ class WebSocketClient {
   // ──────────────────── Personal User Socket ────────────────────
 
   public connectUser(tgId: number) {
-    if (this.currentTgId === tgId && this.userWs && this.userWs.readyState === WebSocket.OPEN) {
+    if (this.currentTgId === tgId && this.userWs && (this.userWs.readyState === WebSocket.OPEN || this.userWs.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
     this.currentTgId = tgId;
-    this.disconnectUser();
+    this.cleanupUserSocket();
     this.setStatus("connecting");
 
     try {
       const url = this.getWsUrl(`/ws/user/${tgId}`);
-      this.userWs = new WebSocket(url);
+      const ws = new WebSocket(url);
+      this.userWs = ws;
 
-      this.userWs.onopen = () => {
-        this.isUserReconnecting = false;
+      ws.onopen = () => {
+        if (this.userWs !== ws) return;
+        this.clearUserReconnectTimer();
         this.setStatus("connected");
         this.startHeartbeat("user");
       };
 
-      this.userWs.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const data: UserWsMessage = JSON.parse(event.data);
           this.userListeners.forEach((listener) => listener(data));
@@ -99,35 +111,68 @@ class WebSocketClient {
         }
       };
 
-      this.userWs.onclose = () => {
+      ws.onclose = () => {
+        if (this.userWs !== ws) return;
         this.stopHeartbeat("user");
         this.setStatus("disconnected");
-        if (this.currentTgId && !this.isUserReconnecting) {
-          this.isUserReconnecting = true;
-          this.setStatus("connecting");
-          setTimeout(() => {
-            if (this.currentTgId) this.connectUser(this.currentTgId);
-          }, 3000);
-        }
+        this.scheduleUserReconnect();
       };
 
-      this.userWs.onerror = () => {
+      ws.onerror = () => {
+        if (this.userWs !== ws) return;
         this.setStatus("disconnected");
-        this.userWs?.close();
+        try {
+          ws.close();
+        } catch {
+          // already closed
+        }
       };
     } catch (err) {
       console.warn("User WebSocket connect error:", err);
       this.setStatus("disconnected");
+      this.scheduleUserReconnect();
+    }
+  }
+
+  private scheduleUserReconnect() {
+    this.clearUserReconnectTimer();
+    if (!this.currentTgId) return;
+
+    this.userReconnectTimer = setTimeout(() => {
+      this.userReconnectTimer = null;
+      if (this.currentTgId) {
+        this.connectUser(this.currentTgId);
+      }
+    }, 3000);
+  }
+
+  private clearUserReconnectTimer() {
+    if (this.userReconnectTimer) {
+      clearTimeout(this.userReconnectTimer);
+      this.userReconnectTimer = null;
+    }
+  }
+
+  private cleanupUserSocket() {
+    this.stopHeartbeat("user");
+    this.clearUserReconnectTimer();
+    if (this.userWs) {
+      this.userWs.onopen = null;
+      this.userWs.onclose = null;
+      this.userWs.onerror = null;
+      this.userWs.onmessage = null;
+      try {
+        this.userWs.close();
+      } catch {
+        // ignore
+      }
+      this.userWs = null;
     }
   }
 
   public disconnectUser() {
-    this.stopHeartbeat("user");
-    if (this.userWs) {
-      this.userWs.onclose = null;
-      this.userWs.close();
-      this.userWs = null;
-    }
+    this.currentTgId = null;
+    this.cleanupUserSocket();
     this.setStatus("disconnected");
   }
 
@@ -141,23 +186,25 @@ class WebSocketClient {
   // ──────────────────── Room Queue Socket ────────────────────
 
   public connectRoom(subject: string) {
-    if (this.currentSubject === subject && this.queueWs && this.queueWs.readyState === WebSocket.OPEN) {
+    if (this.currentSubject === subject && this.queueWs && (this.queueWs.readyState === WebSocket.OPEN || this.queueWs.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
     this.currentSubject = subject;
-    this.disconnectRoom();
+    this.cleanupRoomSocket();
 
     try {
       const url = this.getWsUrl(`/ws/queue/${encodeURIComponent(subject)}`);
-      this.queueWs = new WebSocket(url);
+      const ws = new WebSocket(url);
+      this.queueWs = ws;
 
-      this.queueWs.onopen = () => {
-        this.isRoomReconnecting = false;
+      ws.onopen = () => {
+        if (this.queueWs !== ws) return;
+        this.clearRoomReconnectTimer();
         this.startHeartbeat("room");
       };
 
-      this.queueWs.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const data: RoomWsMessage = JSON.parse(event.data);
           this.roomListeners.forEach((listener) => listener(data));
@@ -166,31 +213,65 @@ class WebSocketClient {
         }
       };
 
-      this.queueWs.onclose = () => {
+      ws.onclose = () => {
+        if (this.queueWs !== ws) return;
         this.stopHeartbeat("room");
-        if (this.currentSubject && !this.isRoomReconnecting) {
-          this.isRoomReconnecting = true;
-          setTimeout(() => {
-            if (this.currentSubject) this.connectRoom(this.currentSubject);
-          }, 3000);
-        }
+        this.scheduleRoomReconnect();
       };
 
-      this.queueWs.onerror = () => {
-        this.queueWs?.close();
+      ws.onerror = () => {
+        if (this.queueWs !== ws) return;
+        try {
+          ws.close();
+        } catch {
+          // already closed
+        }
       };
     } catch (err) {
       console.warn("Room WebSocket connect error:", err);
+      this.scheduleRoomReconnect();
+    }
+  }
+
+  private scheduleRoomReconnect() {
+    this.clearRoomReconnectTimer();
+    if (!this.currentSubject) return;
+
+    this.roomReconnectTimer = setTimeout(() => {
+      this.roomReconnectTimer = null;
+      if (this.currentSubject) {
+        this.connectRoom(this.currentSubject);
+      }
+    }, 3000);
+  }
+
+  private clearRoomReconnectTimer() {
+    if (this.roomReconnectTimer) {
+      clearTimeout(this.roomReconnectTimer);
+      this.roomReconnectTimer = null;
+    }
+  }
+
+  private cleanupRoomSocket() {
+    this.stopHeartbeat("room");
+    this.clearRoomReconnectTimer();
+    if (this.queueWs) {
+      this.queueWs.onopen = null;
+      this.queueWs.onclose = null;
+      this.queueWs.onerror = null;
+      this.queueWs.onmessage = null;
+      try {
+        this.queueWs.close();
+      } catch {
+        // ignore
+      }
+      this.queueWs = null;
     }
   }
 
   public disconnectRoom() {
-    this.stopHeartbeat("room");
-    if (this.queueWs) {
-      this.queueWs.onclose = null;
-      this.queueWs.close();
-      this.queueWs = null;
-    }
+    this.currentSubject = null;
+    this.cleanupRoomSocket();
   }
 
   public onRoomEvent(listener: RoomListener) {
@@ -200,6 +281,17 @@ class WebSocketClient {
     };
   }
 
+  // ──────────────────── Foreground & Reconnect Trigger ────────────────────
+
+  public reconnectIfDisconnected() {
+    if (this.currentTgId && (!this.userWs || this.userWs.readyState === WebSocket.CLOSED || this.userWs.readyState === WebSocket.CLOSING)) {
+      this.connectUser(this.currentTgId);
+    }
+    if (this.currentSubject && (!this.queueWs || this.queueWs.readyState === WebSocket.CLOSED || this.queueWs.readyState === WebSocket.CLOSING)) {
+      this.connectRoom(this.currentSubject);
+    }
+  }
+
   // ──────────────────── Heartbeat (ping/pong) ────────────────────
 
   private startHeartbeat(type: "user" | "room") {
@@ -207,16 +299,24 @@ class WebSocketClient {
       this.stopHeartbeat("user");
       this.userPingInterval = setInterval(() => {
         if (this.userWs && this.userWs.readyState === WebSocket.OPEN) {
-          this.userWs.send(JSON.stringify({ type: "ping" }));
+          try {
+            this.userWs.send(JSON.stringify({ type: "ping" }));
+          } catch {
+            // failed send
+          }
         }
-      }, 25000);
+      }, 20000);
     } else {
       this.stopHeartbeat("room");
       this.roomPingInterval = setInterval(() => {
         if (this.queueWs && this.queueWs.readyState === WebSocket.OPEN) {
-          this.queueWs.send(JSON.stringify({ type: "ping" }));
+          try {
+            this.queueWs.send(JSON.stringify({ type: "ping" }));
+          } catch {
+            // failed send
+          }
         }
-      }, 25000);
+      }, 20000);
     }
   }
 

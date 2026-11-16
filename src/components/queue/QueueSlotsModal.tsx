@@ -8,6 +8,7 @@ import {
   ArrowsLeftRight,
   UserPlus,
   PencilSimple,
+  ArrowRight,
 } from '@phosphor-icons/react';
 import {
   Drawer,
@@ -30,6 +31,7 @@ import {
   useMyPosition,
   useJoinQueueMutation,
   useLeaveQueueMutation,
+  useMoveQueuePositionMutation,
   useCuratorDeleteQueueMutation,
   useCuratorKickMutation,
   useUpdateAutoDeleteMutation,
@@ -125,26 +127,17 @@ export function QueueSlotsModal({
   const [isDeleteDrawerOpen, setIsDeleteDrawerOpen] = useState(false);
   const [deleteInputText, setDeleteInputText] = useState('');
   const [isDirectSwapOpen, setIsDirectSwapOpen] = useState(false);
+  const [targetMovePosition, setTargetMovePosition] = useState<number | null>(null);
+  const [isMoveDrawerOpen, setIsMoveDrawerOpen] = useState(false);
 
-  // Defer WebSocket connection until after the drawer open animation settles (~300ms)
-  const [wsReady, setWsReady] = useState(false);
-  useEffect(() => {
-    if (!isOpen) {
-      setWsReady(false);
-      return;
-    }
-    const id = setTimeout(() => setWsReady(true), 320);
-    return () => clearTimeout(id);
-  }, [isOpen]);
-
-  useRoomSubscription(wsReady && subject ? subject : null);
+  useRoomSubscription(isOpen && subject ? subject : null);
 
   const { data: queuesData } = useQueuesList();
   const foundQueue = queuesData?.queues?.find((q) => q.subject === subject);
   const userKnownPos =
-    initialMeta?.my_position !== undefined && initialMeta?.my_position !== null
-      ? initialMeta.my_position
-      : (foundQueue?.my_position ?? null);
+    foundQueue?.my_position !== undefined && foundQueue?.my_position !== null
+      ? foundQueue.my_position
+      : (initialMeta?.my_position ?? null);
 
   const currentMeta = foundQueue
     ? {
@@ -161,6 +154,13 @@ export function QueueSlotsModal({
   } = useQueueDetail(isOpen ? subject : null);
   const { data: myPosData } = useMyPosition(isOpen ? subject : null, user?.tg_id);
 
+  // Immediately refetch freshest queue details on open
+  useEffect(() => {
+    if (isOpen && subject) {
+      refetchQueue();
+    }
+  }, [isOpen, subject, refetchQueue]);
+
   // Auto-close modal ONLY if queue existed while open and was subsequently deleted
   const hasLoadedInitialMeta = useRef(false);
 
@@ -170,6 +170,8 @@ export function QueueSlotsModal({
     }
     if (!isOpen) {
       hasLoadedInitialMeta.current = false;
+      setIsMoveDrawerOpen(false);
+      setTargetMovePosition(null);
     }
   }, [isOpen, currentMeta]);
 
@@ -189,6 +191,7 @@ export function QueueSlotsModal({
 
   const joinMutation = useJoinQueueMutation();
   const leaveMutation = useLeaveQueueMutation();
+  const moveMutation = useMoveQueuePositionMutation();
   const deleteMutation = useCuratorDeleteQueueMutation();
   const kickMutation = useCuratorKickMutation();
   const updateAutoDeleteMutation = useUpdateAutoDeleteMutation();
@@ -198,7 +201,19 @@ export function QueueSlotsModal({
   const isCreator = user?.tg_id
     ? currentMeta?.created_by_tg_id === user.tg_id
     : false;
-  const myPosition = myPosData?.position ?? userKnownPos;
+
+  const mySlotInQueue = useMemo(() => {
+    if (!queueData?.queue || !user?.tg_id) return null;
+    return (
+      queueData.queue.find(
+        (s) => !s.is_free && Number(s.tg_id) === Number(user.tg_id)
+      ) ?? null
+    );
+  }, [queueData?.queue, user?.tg_id]);
+
+  const myPosition = queueData
+    ? (mySlotInQueue ? mySlotInQueue.position : null)
+    : (myPosData?.position ?? (foundQueue?.my_position ?? initialMeta?.my_position ?? null));
   const totalPositions =
     queueData?.total_positions || currentMeta?.total_positions || 30;
 
@@ -223,24 +238,28 @@ export function QueueSlotsModal({
         return;
       }
 
-      // 2. Click on free slot while enrolled
+      // 2. Click on free slot while enrolled -> open Move confirmation drawer
       if (isFree && myPosition) {
-        haptic.warning();
-        toast.info(
-          `Вы уже записаны на место ${myPosition}. Сначала освободите его, чтобы сменить.`,
-        );
+        if (myPosition === slotPos) {
+          haptic.light();
+          toast.info(`Это ваше место ${slotPos}`);
+          return;
+        }
+        haptic.selection();
+        setTargetMovePosition(slotPos);
+        setIsMoveDrawerOpen(true);
         return;
       }
 
       // 3. Click on own slot
-      if (!isFree && slotUserId === user?.tg_id) {
+      if (!isFree && slotUserId && Number(slotUserId) === Number(user?.tg_id)) {
         haptic.light();
         toast.info(`Это ваше место ${slotPos}`);
         return;
       }
 
       // 4. Creator kick
-      if (isCreator && !isFree && slotUserId && slotUserId !== user?.tg_id) {
+      if (isCreator && !isFree && slotUserId && Number(slotUserId) !== Number(user?.tg_id)) {
         setSelectedSlotForKick({
           pos: slotPos,
           tgId: slotUserId,
@@ -250,7 +269,7 @@ export function QueueSlotsModal({
       }
 
       // 5. Swap request
-      if (!isFree && myPosition && slotUserId && slotUserId !== user?.tg_id) {
+      if (!isFree && myPosition && slotUserId && Number(slotUserId) !== Number(user?.tg_id)) {
         onRequestSwap(slotPos, name || `Участник ${slotPos}`);
         return;
       }
@@ -264,6 +283,23 @@ export function QueueSlotsModal({
     },
     [myPosition, user?.tg_id, subject, isCreator, joinMutation, onRequestSwap],
   );
+
+  const handleMoveConfirm = useCallback(() => {
+    if (!subject || !user?.tg_id || targetMovePosition === null) return;
+    haptic.selection();
+    moveMutation.mutate(
+      {
+        subject,
+        data: { tg_id: user.tg_id, position: targetMovePosition },
+      },
+      {
+        onSuccess: () => {
+          setIsMoveDrawerOpen(false);
+          setTargetMovePosition(null);
+        },
+      }
+    );
+  }, [subject, user?.tg_id, targetMovePosition, moveMutation]);
 
   const handleQuickJoinFirst = useCallback(() => {
     if (!subject || !user?.tg_id || myPosition) return;
@@ -333,8 +369,8 @@ export function QueueSlotsModal({
       const pos = i + 1;
       const existing = queueMap.get(pos);
       const isFree = existing ? existing.is_free : (myPosition !== pos);
-      const isMe = !isFree
-        ? (existing?.tg_id === user?.tg_id || myPosition === pos)
+      const isMe = queueData
+        ? Boolean(!isFree && user?.tg_id && Number(existing?.tg_id) === Number(user.tg_id))
         : (myPosition === pos);
       return {
         pos,
@@ -648,6 +684,80 @@ export function QueueSlotsModal({
                 {deleteMutation.isPending
                   ? 'Удаление...'
                   : 'Подтвердить удаление'}
+              </Button>
+              <DrawerClose asChild>
+                <Button
+                  variant="secondary"
+                  className="w-full rounded-2xl h-12 text-sm font-medium"
+                >
+                  Отмена
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      )}
+
+      {/* Move / Switch Slot Confirmation Drawer */}
+      {isMoveDrawerOpen && targetMovePosition !== null && (
+        <Drawer
+          open={isMoveDrawerOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setIsMoveDrawerOpen(false);
+              setTargetMovePosition(null);
+            }
+          }}
+        >
+          <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
+            <DrawerHeader className="px-6 pt-6 pb-2 text-center sm:text-left">
+              <DrawerTitle className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                <ArrowsLeftRight size={22} className="text-primary" weight="bold" />
+                Смена места в очереди
+              </DrawerTitle>
+              <DrawerDescription className="text-sm text-muted-foreground font-medium mt-1.5 text-left">
+                Вы действительно хотите перейти на место{' '}
+                <span className="font-bold text-foreground">#{targetMovePosition}</span>?
+              </DrawerDescription>
+            </DrawerHeader>
+
+            <div className="px-6 py-3 flex flex-col gap-3">
+              <div className="bg-secondary/40 border border-border/40 rounded-2xl p-4 flex items-center justify-between">
+                <div className="flex flex-col items-center flex-1">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Текущее место
+                  </span>
+                  <span className="text-lg font-bold text-foreground mt-0.5">
+                    #{myPosition}
+                  </span>
+                </div>
+                <div className="text-muted-foreground px-2">
+                  <ArrowRight size={20} weight="bold" />
+                </div>
+                <div className="flex flex-col items-center flex-1">
+                  <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
+                    Новое место
+                  </span>
+                  <span className="text-lg font-bold text-primary mt-0.5">
+                    #{targetMovePosition}
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground/90 px-1">
+                Ваше текущее место <strong className="text-foreground">#{myPosition}</strong> будет освобождено и станет доступно другим участникам.
+              </p>
+            </div>
+
+            <DrawerFooter className="px-6 pt-2 pb-10 flex flex-col gap-2.5">
+              <Button
+                variant="default"
+                className="w-full rounded-2xl h-12 text-sm font-semibold gap-2"
+                onClick={handleMoveConfirm}
+                disabled={moveMutation.isPending}
+              >
+                {moveMutation.isPending
+                  ? 'Переход...'
+                  : `Перейти на место #${targetMovePosition}`}
               </Button>
               <DrawerClose asChild>
                 <Button

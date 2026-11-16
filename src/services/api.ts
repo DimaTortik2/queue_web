@@ -119,6 +119,11 @@ export const api = {
       method: "DELETE",
     }),
 
+  deleteSubjectByName: (name: string) =>
+    request<{ status: string }>(`/api/subjects/by-name/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+    }),
+
   // Queues
   listQueues: (params?: { search?: string; subject_name?: string; is_paused?: boolean }) => {
     const q = new URLSearchParams();
@@ -163,6 +168,22 @@ export const api = {
     request<{ status: string }>(`/queue/${encodeURIComponent(subject)}/leave`, {
       method: "POST",
       body: JSON.stringify(data),
+    }),
+
+  moveQueuePosition: (subject: string, data: UserDto) =>
+    request<{ status: string; position?: number }>(
+      `/queue/${encodeURIComponent(subject)}/move`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    ).catch(async (err) => {
+      // Graceful fallback if backend has not reloaded /move endpoint yet
+      if (err.status === 404 || err.message?.includes("404")) {
+        await api.leaveQueue(subject, { tg_id: data.tg_id, position: 0 });
+        return api.joinQueue(subject, data);
+      }
+      throw err;
     }),
 
   kickFromQueue: (subject: string, data: KickDto) =>

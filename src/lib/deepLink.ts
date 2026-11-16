@@ -114,16 +114,42 @@ export function resolveQueueSubject(
 
 /**
  * Generates a shareable direct link to a queue.
- * Uses Telegram Mini App startapp format if VITE_TELEGRAM_BOT_USERNAME is provided,
- * otherwise falls back to a web URL query string.
+ * Prioritizes direct Telegram Mini App (TMA) link formats:
+ * 1. VITE_TMA_URL (e.g. https://t.me/queue_college_bot or https://t.me/queue_college_bot/app)
+ * 2. VITE_TELEGRAM_BOT_USERNAME (+ optional VITE_TELEGRAM_APP_NAME)
+ * 3. Default fallback to https://t.me/queue_college_bot?startapp=...
  */
 export function generateQueueDeepLink(subject: string): string {
-  const botUsername = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "")
+  const param = encodeQueueParam(subject);
+
+  // 1. Direct TMA URL from env (e.g. "https://t.me/queue_college_bot" or "https://t.me/queue_college_bot/app")
+  const rawTmaUrl = (
+    import.meta.env.VITE_TMA_URL ||
+    import.meta.env.VITE_TELEGRAM_APP_URL ||
+    ""
+  ).trim();
+
+  if (rawTmaUrl) {
+    try {
+      const url = new URL(
+        rawTmaUrl.startsWith("http") ? rawTmaUrl : `https://${rawTmaUrl}`
+      );
+      url.searchParams.set("startapp", param);
+      return url.toString();
+    } catch {
+      const sep = rawTmaUrl.includes("?") ? "&" : "?";
+      return `${rawTmaUrl}${sep}startapp=${param}`;
+    }
+  }
+
+  // 2. Bot username + optional App short name (default to "queue_college_bot")
+  const botUsername = (
+    import.meta.env.VITE_TELEGRAM_BOT_USERNAME ||
+    "queue_college_bot"
+  )
     .trim()
     .replace(/^@/, "");
   const appName = (import.meta.env.VITE_TELEGRAM_APP_NAME || "").trim();
-
-  const param = encodeQueueParam(subject);
 
   if (botUsername) {
     if (appName) {
@@ -132,7 +158,7 @@ export function generateQueueDeepLink(subject: string): string {
     return `https://t.me/${botUsername}?startapp=${param}`;
   }
 
-  // Web fallback
+  // 3. Web fallback
   try {
     const origin = window.location.origin;
     const pathname = window.location.pathname;

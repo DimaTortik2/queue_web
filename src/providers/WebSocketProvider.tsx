@@ -25,6 +25,32 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const queryClient = useQueryClient();
   const { setUrgentAlert, setActiveSwapProposal } = useNotificationStore();
 
+  // ──────────────────── Visibility & Reconnection Handler ────────────────────
+  useEffect(() => {
+    const handleActive = () => {
+      if (document.visibilityState === "visible") {
+        wsService.reconnectIfDisconnected();
+        // Immediately sync all queues when app becomes visible / focused
+        queryClient.invalidateQueries({ queryKey: queueKeys.all });
+      }
+    };
+
+    const handleOnline = () => {
+      wsService.reconnectIfDisconnected();
+      queryClient.invalidateQueries({ queryKey: queueKeys.all });
+    };
+
+    document.addEventListener("visibilitychange", handleActive);
+    window.addEventListener("focus", handleActive);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleActive);
+      window.removeEventListener("focus", handleActive);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [queryClient]);
+
   // ──────────────────── Personal User Socket ────────────────────
   useEffect(() => {
     if (!user?.tg_id) return;
@@ -53,19 +79,25 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           break;
         }
 
-        case "swap_accepted":
+        case "swap_accepted": {
           haptic.success();
           sound.success();
           toast.success(msg.message || "Ваш запрос на обмен принят", { id: "swap_accepted" });
-          if (msg.subject) {
-            queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
+          const eventSub = msg.subject || (msg.data as { subject?: string } | undefined)?.subject;
+          if (eventSub) {
+            queryClient.invalidateQueries({ queryKey: queueKeys.detail(eventSub) });
             queryClient.invalidateQueries({
-              queryKey: queueKeys.myPosition(msg.subject, user.tg_id),
+              queryKey: queueKeys.myPosition(eventSub, user.tg_id),
+            });
+            queryClient.invalidateQueries({
+              queryKey: [...queueKeys.all, "swap-candidates", eventSub],
             });
           }
+          queryClient.invalidateQueries({ queryKey: queueKeys.all });
           queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(user.tg_id) });
           queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
           break;
+        }
 
         case "swap_rejected":
           haptic.error();
@@ -147,18 +179,24 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         case "queue_updated":
         case "queue_advanced":
         case "queue_cleared":
-        case "swap_request_accepted":
+        case "swap_request_accepted": {
           queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
           queryClient.invalidateQueries({ queryKey: queueKeys.all });
-          if (msg.subject) {
-            queryClient.invalidateQueries({ queryKey: queueKeys.detail(msg.subject) });
-            queryClient.invalidateQueries({ queryKey: queueKeys.stats(msg.subject) });
-            queryClient.invalidateQueries({
-              queryKey: queueKeys.myPosition(msg.subject, user.tg_id),
-            });
+          const eventSubject = msg.subject || (msg.data as { subject?: string } | undefined)?.subject;
+          if (eventSubject) {
+            queryClient.invalidateQueries({ queryKey: queueKeys.detail(eventSubject) });
+            queryClient.invalidateQueries({ queryKey: queueKeys.stats(eventSubject) });
+            if (user?.tg_id) {
+              queryClient.invalidateQueries({
+                queryKey: queueKeys.myPosition(eventSubject, user.tg_id),
+              });
+            }
           }
-          queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(user.tg_id) });
+          if (user?.tg_id) {
+            queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(user.tg_id) });
+          }
           break;
+        }
 
         default:
           break;

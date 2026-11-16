@@ -62,7 +62,9 @@ export function useQueuesList(params?: {
     queryKey: queueKeys.list(params),
     queryFn: () => api.listQueues(params),
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 3,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -71,6 +73,9 @@ export function useUserActiveQueues(tgId: number | undefined) {
     queryKey: queueKeys.userQueues(tgId || 0),
     queryFn: () => (tgId ? api.getUserQueues(tgId) : Promise.resolve({ queues: [], total: 0 })),
     enabled: !!tgId,
+    staleTime: 1000 * 3,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -80,7 +85,9 @@ export function useQueueDetail(subject: string | null) {
     queryFn: () => (subject ? api.getQueue(subject) : Promise.reject("No subject")),
     enabled: !!subject,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 2,
+    refetchInterval: 2500,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -93,7 +100,9 @@ export function useMyPosition(subject: string | null, tgId: number | undefined) 
         : Promise.reject("Missing subject or tgId"),
     enabled: !!subject && !!tgId,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 2,
+    refetchInterval: 3000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -106,7 +115,9 @@ export function useSwapCandidates(subject: string | null, tgId: number | undefin
         : Promise.resolve([]),
     enabled: !!subject && !!tgId,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 2,
+    refetchInterval: 4000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -116,7 +127,8 @@ export function useQueueStats(subject: string | null) {
     queryFn: () => (subject ? api.getQueueStats(subject) : Promise.reject("No subject")),
     enabled: !!subject,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 3,
+    refetchInterval: 5000,
   });
 }
 
@@ -126,7 +138,8 @@ export function useQueueHistory(subject: string | null) {
     queryFn: () => (subject ? api.getQueueHistory(subject) : Promise.reject("No subject")),
     enabled: !!subject,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 3,
+    refetchInterval: 5000,
   });
 }
 
@@ -135,7 +148,7 @@ export function useSubjectsList(search?: string) {
     queryKey: queueKeys.subjectsList(search),
     queryFn: () => api.getSubjects(search),
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 10,
   });
 }
 
@@ -148,7 +161,9 @@ export function useIncomingSwaps(subject: string | null, tgId: number | undefine
         : Promise.resolve({ requests: [], total: 0 }),
     enabled: !!subject && !!tgId,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 3,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -161,7 +176,9 @@ export function useOutgoingSwaps(subject: string | null, tgId: number | undefine
         : Promise.resolve({ requests: [], total: 0 }),
     enabled: !!subject && !!tgId,
     placeholderData: (prev) => prev,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 3,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -212,6 +229,35 @@ export function useLeaveQueueMutation() {
   });
 }
 
+export function useMoveQueuePositionMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ subject, data }: { subject: string; data: UserDto }) =>
+      api.moveQueuePosition(subject, data),
+    onSuccess: (_, { subject, data }) => {
+      haptic.success();
+      sound.joinQueue();
+      toast.success(`Вы перешли на место #${data.position}`, { id: `queue_move_${subject}` });
+      queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "my-position", subject] });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "swap-candidates", subject] });
+      queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.all });
+    },
+    onError: (err: Error, variables) => {
+      haptic.error();
+      sound.error();
+      toast.error(err.message || "Ошибка смены места", { id: "move_err" });
+      if (variables?.subject) {
+        queryClient.invalidateQueries({ queryKey: queueKeys.detail(variables.subject) });
+      }
+    },
+  });
+}
+
 export function useCreateSwapRequestMutation() {
   const queryClient = useQueryClient();
 
@@ -224,6 +270,7 @@ export function useCreateSwapRequestMutation() {
       toast.success("Запрос на обмен отправлен", { id: "swap_req" });
       queryClient.invalidateQueries({ queryKey: queueKeys.outgoingSwaps(subject, data.from_tg_id) });
       queryClient.invalidateQueries({ queryKey: queueKeys.swapCandidates(subject, data.from_tg_id) });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "swap-candidates", subject] });
     },
     onError: (err: Error) => {
       haptic.error();
@@ -266,8 +313,11 @@ export function useAcceptSwapMutation() {
       queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "my-position", subject] });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "swap-candidates", subject] });
       queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
       queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(data.tg_id) });
+      queryClient.invalidateQueries({ queryKey: queueKeys.all });
     },
     onError: (err: Error) => {
       haptic.error();
@@ -309,6 +359,7 @@ export function useRejectSwapMutation() {
       toast.info("Запрос на обмен отклонен");
       queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "swap-candidates", subject] });
     },
     onError: (err: Error) => {
       haptic.error();
@@ -343,10 +394,12 @@ export function useCancelSwapMutation() {
         }
       );
     },
-    onSuccess: () => {
+    onSuccess: (_, { subject }) => {
       haptic.light();
       toast.info("Запрос на обмен отозван");
       queryClient.invalidateQueries({ queryKey: queueKeys.swaps });
+      queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
+      queryClient.invalidateQueries({ queryKey: [...queueKeys.all, "swap-candidates", subject] });
     },
     onError: (err: Error) => {
       haptic.error();
@@ -518,8 +571,9 @@ export function useDeleteSubjectMutation() {
     mutationFn: (id: number) => api.deleteSubject(id),
     onSuccess: () => {
       haptic.success();
-      toast.info("Предмет удален");
+      toast.info("Предмет удален из подсказок");
       queryClient.invalidateQueries({ queryKey: queueKeys.subjects });
+      queryClient.invalidateQueries({ queryKey: queueKeys.subjectsList() });
     },
     onError: (err: Error) => {
       haptic.error();

@@ -23,8 +23,9 @@ import { SwapRespondDrawer } from "@/components/queue/SwapRespondDrawer";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 30,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      staleTime: 1000 * 2,
     },
   },
 });

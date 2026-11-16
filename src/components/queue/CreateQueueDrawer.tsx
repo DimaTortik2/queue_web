@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
-import { Plus } from '@phosphor-icons/react';
+import { useState, useCallback, useEffect } from 'react';
+import { Plus, X, Trash } from '@phosphor-icons/react';
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
+  DrawerDescription,
   DrawerFooter,
   DrawerClose,
 } from '@/components/ui/drawer';
@@ -13,6 +14,7 @@ import { useUserStore } from '@/store/userStore';
 import {
   useSubjectsList,
   useCreateSubjectMutation,
+  useDeleteSubjectMutation,
   useCreateQueueMutation,
   useJoinQueueMutation,
 } from '@/hooks/useQueueApi';
@@ -28,11 +30,13 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
   const { user } = useUserStore();
   const { data: subjectsData } = useSubjectsList();
   const createSubjectMutation = useCreateSubjectMutation();
+  const deleteSubjectMutation = useDeleteSubjectMutation();
   const createQueueMutation = useCreateQueueMutation();
   const joinMutation = useJoinQueueMutation();
 
   const [subjectName, setSubjectName] = useState('');
   const [customSubject, setCustomSubject] = useState('');
+  const [subjectToDelete, setSubjectToDelete] = useState<{ id: number; name: string } | null>(null);
   const [queueType, setQueueType] = useState('');
   const [maxPositions, setMaxPositions] = useState<number>(30);
   const [chosenPosition, setChosenPosition] = useState<number>(1);
@@ -41,6 +45,26 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
   const [isAutoDeleteValid, setIsAutoDeleteValid] = useState<boolean>(true);
 
   const subjects = subjectsData?.subject_list || [];
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSubjectToDelete(null);
+    }
+  }, [isOpen]);
+
+  const handleConfirmDeleteSubject = () => {
+    if (!subjectToDelete) return;
+    const deletingName = subjectToDelete.name;
+    deleteSubjectMutation.mutate(subjectToDelete.id, {
+      onSuccess: () => {
+        haptic.success();
+        if (subjectName === deletingName) {
+          setSubjectName('');
+        }
+        setSubjectToDelete(null);
+      },
+    });
+  };
 
   const handleAutoDeleteChange = useCallback(
     (isoString: string | null, isValid: boolean) => {
@@ -114,7 +138,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
   );
 
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
         <DrawerHeader className="px-6 pt-6 pb-2">
           <DrawerTitle className="text-xl font-bold tracking-tight text-foreground">
@@ -133,21 +158,41 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
               {subjects.map((s) => {
                 const isSelected = subjectName === s.name;
                 return (
-                  <button
+                  <div
                     key={s.id}
-                    type="button"
-                    onClick={() => {
-                      haptic.selection();
-                      setSubjectName(s.name);
-                    }}
-                    className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all ${
                       isSelected
-                        ? 'bg-foreground text-background'
+                        ? 'bg-foreground text-background shadow-sm'
                         : 'bg-secondary text-foreground hover:bg-secondary/80'
                     }`}
                   >
-                    {s.name}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.selection();
+                        setSubjectName(s.name);
+                      }}
+                      className="py-2.5 pl-3.5 pr-1.5 focus:outline-none"
+                    >
+                      {s.name}
+                    </button>
+                    <button
+                      type="button"
+                      title={`Удалить «${s.name}» из подсказок`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        haptic.light();
+                        setSubjectToDelete(s);
+                      }}
+                      className={`p-1.5 mr-1 rounded-lg transition-colors flex items-center justify-center focus:outline-none ${
+                        isSelected
+                          ? 'text-background/60 hover:text-destructive hover:bg-background/20'
+                          : 'text-muted-foreground/60 hover:text-destructive hover:bg-foreground/10'
+                      }`}
+                    >
+                      <X size={12} weight="bold" />
+                    </button>
+                  </div>
                 );
               })}
 
@@ -202,11 +247,11 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
           {/* Max Positions Carousel Selection */}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Всего мест в очереди ({maxPositions})
+              Всего мест в очереди
             </label>
             <div className="w-full overflow-hidden">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
-                {[10, 15, 20, 25, 30].map((count) => {
+                {[30, 25, 20, 15, 10].map((count) => {
                   const isSelected = maxPositions === count;
                   return (
                     <button
@@ -219,7 +264,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
                       }}
                       className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start min-w-[85px] transition-all ${
                         isSelected
-                          ? 'bg-foreground text-background'
+                          ? 'bg-foreground text-background shadow-sm'
                           : 'bg-secondary text-foreground hover:bg-secondary/80'
                       }`}
                     >
@@ -326,5 +371,60 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
-  );
+
+    {/* Delete Subject from Suggestions Confirmation Drawer */}
+    {subjectToDelete && (
+      <Drawer
+        open={!!subjectToDelete}
+        onOpenChange={(open) => {
+          if (!open) setSubjectToDelete(null);
+        }}
+      >
+        <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0">
+          <DrawerHeader className="px-6 pt-6 pb-2 text-center sm:text-left">
+            <DrawerTitle className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Trash size={22} className="text-destructive" weight="bold" />
+              Удалить из подсказок?
+            </DrawerTitle>
+            <DrawerDescription className="text-sm text-muted-foreground font-medium mt-1.5 text-left">
+              Удалить предмет <strong className="text-foreground">«{subjectToDelete.name}»</strong> из списка подсказок?
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-6 py-3">
+            <div className="bg-secondary/40 border border-border/40 rounded-2xl p-4 text-xs text-muted-foreground leading-relaxed flex flex-col gap-1.5">
+              <span className="font-semibold text-foreground">
+                Существующие очереди не удалятся
+              </span>
+              <span>
+                Все уже созданные очереди по предмету «{subjectToDelete.name}» продолжат работать в обычном режиме. Предмет просто перестанет предлагаться при создании новых очередей.
+              </span>
+            </div>
+          </div>
+
+          <DrawerFooter className="px-6 pt-2 pb-10 flex flex-col gap-2.5">
+            <Button
+              variant="destructive"
+              className="w-full rounded-2xl h-12 text-sm font-semibold gap-2"
+              onClick={handleConfirmDeleteSubject}
+              disabled={deleteSubjectMutation.isPending}
+            >
+              {deleteSubjectMutation.isPending
+                ? 'Удаление...'
+                : 'Удалить из подсказок'}
+            </Button>
+            <DrawerClose asChild>
+              <Button
+                variant="secondary"
+                className="w-full rounded-2xl h-12 text-sm font-medium"
+              >
+                Отмена
+              </Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    )}
+  </>
+);
 }

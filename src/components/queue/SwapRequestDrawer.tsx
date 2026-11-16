@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ArrowsLeftRight, Check } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 import {
   Drawer,
   DrawerContent,
@@ -39,24 +40,60 @@ export function SwapRequestDrawer({
     useState<SwapCandidate | null>(null);
   const [message, setMessage] = useState('');
 
-  const { data: candidates = [], isLoading } = useSwapCandidates(
-    subject,
-    user?.tg_id,
-  );
+  const {
+    data: candidates = [],
+    isLoading,
+    refetch: refetchCandidates,
+  } = useSwapCandidates(isOpen && subject ? subject : null, user?.tg_id);
 
   const createSwapMutation = useCreateSwapRequestMutation();
 
+  // Reset state and immediately refetch fresh candidates when drawer opens
   useEffect(() => {
-    if (preselectedPos && candidates.length > 0) {
-      const match = candidates.find((c) => c.position === preselectedPos);
-      if (match) setSelectedCandidate(match);
-    } else if (candidates.length > 0 && !selectedCandidate) {
-      setSelectedCandidate(candidates[0]);
+    if (isOpen && subject && user?.tg_id) {
+      refetchCandidates();
     }
-  }, [preselectedPos, candidates, selectedCandidate]);
+    if (!isOpen) {
+      setSelectedCandidate(null);
+      setMessage('');
+    }
+  }, [isOpen, subject, user?.tg_id, refetchCandidates]);
+
+  // Guaranteed client-side filter: exclude current user from swap candidates
+  const validCandidates = useMemo(() => {
+    return candidates.filter(
+      (c) => !user?.tg_id || Number(c.tg_id) !== Number(user.tg_id)
+    );
+  }, [candidates, user?.tg_id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (preselectedPos && validCandidates.length > 0) {
+      const match = validCandidates.find((c) => c.position === preselectedPos);
+      if (match) {
+        setSelectedCandidate(match);
+        return;
+      }
+    }
+
+    if (
+      validCandidates.length > 0 &&
+      (!selectedCandidate ||
+        !validCandidates.some((c) => c.position === selectedCandidate.position))
+    ) {
+      setSelectedCandidate(validCandidates[0]);
+    }
+  }, [isOpen, preselectedPos, validCandidates, selectedCandidate]);
 
   const handleSubmit = () => {
     if (!subject || !user?.tg_id || !selectedCandidate) return;
+
+    if (user?.tg_id && Number(selectedCandidate.tg_id) === Number(user.tg_id)) {
+      haptic.warning();
+      toast.warning('Нельзя отправить запрос на обмен самому себе');
+      return;
+    }
 
     createSwapMutation.mutate(
       {
@@ -94,7 +131,7 @@ export function SwapRequestDrawer({
             <div className="py-8 text-center text-xs text-muted-foreground">
               Загрузка подходящих кандидатов...
             </div>
-          ) : candidates.length === 0 ? (
+          ) : validCandidates.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
               В очереди пока нет других участников, доступных для обмена.
             </div>
@@ -104,7 +141,7 @@ export function SwapRequestDrawer({
                 Выберите участника:
               </span>
               <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-                {candidates.map((c) => {
+                {validCandidates.map((c) => {
                   const isSelected = selectedCandidate?.position === c.position;
                   return (
                     <button
