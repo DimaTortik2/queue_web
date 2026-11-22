@@ -184,7 +184,7 @@ export function useOutgoingSwaps(subject: string | null, tgId: number | undefine
 
 // ──────────────────── Mutations ────────────────────
 
-export function useJoinQueueMutation() {
+export function useJoinQueueMutation({ showToast = true } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -193,7 +193,9 @@ export function useJoinQueueMutation() {
     onSuccess: (_, { subject, data }) => {
       haptic.success();
       sound.joinQueue();
-      toast.success(`Вы заняли место #${data.position}`, { id: `queue_join_${subject}` });
+      if (showToast) {
+        toast.success(`Вы заняли место #${data.position}`, { id: `queue_join_${subject}` });
+      }
       queryClient.invalidateQueries({ queryKey: queueKeys.detail(subject) });
       queryClient.invalidateQueries({ queryKey: queueKeys.myPosition(subject, data.tg_id) });
       queryClient.invalidateQueries({ queryKey: queueKeys.userQueues(data.tg_id) });
@@ -202,7 +204,9 @@ export function useJoinQueueMutation() {
     onError: (err: Error) => {
       haptic.error();
       sound.error();
-      toast.error(err.message || "Не удалось занять место", { id: "queue_action_err" });
+      if (showToast) {
+        toast.error(err.message || "Не удалось занять место", { id: "queue_action_err" });
+      }
     },
   });
 }
@@ -536,7 +540,6 @@ export function useCreateQueueMutation() {
     onSuccess: () => {
       haptic.success();
       sound.success();
-      toast.success("Очередь успешно создана");
       queryClient.invalidateQueries({ queryKey: queueKeys.lists() });
     },
     onError: (err: Error) => {

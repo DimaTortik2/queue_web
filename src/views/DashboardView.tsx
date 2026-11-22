@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RetryBanner } from '@/components/ui/retry-banner';
 import { haptic } from '@/lib/telegram';
-import { resolveQueueSubject } from '@/lib/deepLink';
+import { resolveQueueSubject, type QueueShareDetails } from '@/lib/deepLink';
 import {
   useQueuesList,
   useUserActiveQueues,
@@ -16,6 +16,7 @@ import { QueueCard } from '@/components/dashboard/QueueCard';
 import { QueueSlotsModal } from '@/components/queue/QueueSlotsModal';
 import { SwapRequestDrawer } from '@/components/queue/SwapRequestDrawer';
 import { CreateQueueDrawer } from '@/components/queue/CreateQueueDrawer';
+import { QueueShareDrawer } from '@/components/queue/QueueShareDrawer';
 import { QueueLogo } from '@/components/ui/QueueLogo';
 
 interface DashboardViewProps {
@@ -40,6 +41,7 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
   const [isSlotsModalOpen, setIsSlotsModalOpen] = useState(false);
   const [isSwapDrawerOpen, setIsSwapDrawerOpen] = useState(false);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [queueToShare, setQueueToShare] = useState<QueueShareDetails | null>(null);
   const [swapTargetPos, setSwapTargetPos] = useState<number | null>(null);
   const [swapTargetName, setSwapTargetName] = useState<string | null>(null);
 
@@ -340,6 +342,7 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
         isOpen={isSlotsModalOpen}
         onClose={handleCloseSlotsModal}
         onRequestSwap={handleRequestSwap}
+        onShare={setQueueToShare}
       />
 
       {/* Swap Request Drawer */}
@@ -359,7 +362,12 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
       <CreateQueueDrawer
         isOpen={isCreateDrawerOpen}
         onClose={() => setIsCreateDrawerOpen(false)}
+        onShare={setQueueToShare}
       />
+
+      {queueToShare && (
+        <QueueShareDrawer queue={queueToShare} onClose={() => setQueueToShare(null)} />
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Plus, X, Trash } from '@phosphor-icons/react';
+import { toast } from 'sonner';
 import {
   Drawer,
   DrawerContent,
@@ -19,20 +20,22 @@ import {
   useJoinQueueMutation,
 } from '@/hooks/useQueueApi';
 import { haptic } from '@/lib/telegram';
+import type { QueueShareDetails } from '@/lib/deepLink';
 import { AutoDeleteSelector } from '@/components/queue/AutoDeleteSelector';
 
 interface CreateQueueDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onShare: (queue: QueueShareDetails) => void;
 }
 
-export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
+export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawerProps) {
   const { user } = useUserStore();
   const { data: subjectsData } = useSubjectsList();
   const createSubjectMutation = useCreateSubjectMutation();
   const deleteSubjectMutation = useDeleteSubjectMutation();
   const createQueueMutation = useCreateQueueMutation();
-  const joinMutation = useJoinQueueMutation();
+  const joinMutation = useJoinQueueMutation({ showToast: false });
 
   const [subjectName, setSubjectName] = useState('');
   const [customSubject, setCustomSubject] = useState('');
@@ -106,18 +109,44 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
       {
         onSuccess: () => {
           const fullSubjectKey = `${finalSubject}:${finalType}`;
+          const shareAction = {
+            label: 'Поделиться',
+            onClick: () =>
+              onShare({
+                subject: fullSubjectKey,
+                subjectName: finalSubject,
+                queueType: finalType,
+                isNew: true,
+              }),
+          };
+          const showCreatedToast = (description?: string) => {
+            toast.success('Очередь успешно создана', {
+              duration: 6000,
+              description,
+              action: shareAction,
+            });
+          };
+
           if (
             joinImmediately &&
             chosenPosition >= 1 &&
             chosenPosition <= maxPositions
           ) {
-            joinMutation.mutate({
-              subject: fullSubjectKey,
-              data: {
-                tg_id: user.tg_id,
-                position: chosenPosition,
+            joinMutation.mutate(
+              {
+                subject: fullSubjectKey,
+                data: {
+                  tg_id: user.tg_id,
+                  position: chosenPosition,
+                },
               },
-            });
+              {
+                onSuccess: () => showCreatedToast(`Вы заняли место #${chosenPosition}`),
+                onError: (err) => showCreatedToast(err.message || 'Не удалось занять место'),
+              },
+            );
+          } else {
+            showCreatedToast();
           }
           onClose();
           setSubjectName('');

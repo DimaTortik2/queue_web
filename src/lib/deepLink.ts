@@ -112,62 +112,56 @@ export function resolveQueueSubject(
   return param;
 }
 
-/**
- * Generates a shareable direct link to a queue.
- * Prioritizes direct Telegram Mini App (TMA) link formats:
- * 1. VITE_TMA_URL (e.g. https://t.me/queue_college_bot or https://t.me/queue_college_bot/app)
- * 2. VITE_TELEGRAM_BOT_USERNAME (+ optional VITE_TELEGRAM_APP_NAME)
- * 3. Default fallback to https://t.me/queue_college_bot?startapp=...
- */
-export function generateQueueDeepLink(subject: string): string {
-  const param = encodeQueueParam(subject);
+const DEFAULT_BOT_NAME = "queue_college_bot";
+const DEFAULT_APP_NAME = "queue";
 
-  // 1. Direct TMA URL from env (e.g. "https://t.me/queue_college_bot" or "https://t.me/queue_college_bot/app")
-  const rawTmaUrl = (
-    import.meta.env.VITE_TMA_URL ||
-    import.meta.env.VITE_TELEGRAM_APP_URL ||
-    ""
-  ).trim();
+function getConfiguredName(value: string | undefined, placeholder: string) {
+  const name = value?.trim().replace(/^@/, "");
+  return name && /^[a-z0-9_]+$/i.test(name) && name.toLowerCase() !== placeholder
+    ? name
+    : undefined;
+}
 
-  if (rawTmaUrl) {
+function getMiniAppUrl(): URL {
+  const appName = getConfiguredName(import.meta.env.VITE_TELEGRAM_APP_NAME, "your_app");
+
+  for (const value of [import.meta.env.VITE_TMA_URL, import.meta.env.VITE_TELEGRAM_APP_URL]) {
+    const rawUrl = value?.trim();
+    if (!rawUrl) continue;
+
     try {
-      const url = new URL(
-        rawTmaUrl.startsWith("http") ? rawTmaUrl : `https://${rawTmaUrl}`
-      );
-      url.searchParams.set("startapp", param);
-      return url.toString();
+      const url = new URL(rawUrl.includes("://") ? rawUrl : `https://${rawUrl}`);
+      if (url.origin !== "https://t.me" || url.username || url.password) continue;
+
+      const match = /^\/([a-z0-9_]+)(?:\/([a-z0-9_]+))?\/?$/i.exec(url.pathname);
+      if (!match) continue;
+
+      const [, bot, app] = match;
+      if (!getConfiguredName(bot, "your_bot") || (app && !getConfiguredName(app, "your_app"))) {
+        continue;
+      }
+
+      if (!app) {
+        const shortName = appName ?? (bot.toLowerCase() === DEFAULT_BOT_NAME ? DEFAULT_APP_NAME : null);
+        if (shortName) url.pathname = `/${bot}/${shortName}`;
+      }
+      return url;
     } catch {
-      const sep = rawTmaUrl.includes("?") ? "&" : "?";
-      return `${rawTmaUrl}${sep}startapp=${param}`;
+      // Try the next configured address.
     }
   }
 
-  // 2. Bot username + optional App short name (default to "queue_college_bot")
-  const botUsername = (
-    import.meta.env.VITE_TELEGRAM_BOT_USERNAME ||
-    "queue_college_bot"
-  )
-    .trim()
-    .replace(/^@/, "");
-  const appName = (import.meta.env.VITE_TELEGRAM_APP_NAME || "").trim();
+  const bot = getConfiguredName(import.meta.env.VITE_TELEGRAM_BOT_USERNAME, "your_bot") ?? DEFAULT_BOT_NAME;
+  const shortName = appName ?? (bot.toLowerCase() === DEFAULT_BOT_NAME ? DEFAULT_APP_NAME : null);
+  const url = new URL(`https://t.me/${bot}`);
+  if (shortName) url.pathname += `/${shortName}`;
+  return url;
+}
 
-  if (botUsername) {
-    if (appName) {
-      return `https://t.me/${botUsername}/${appName}?startapp=${param}`;
-    }
-    return `https://t.me/${botUsername}?startapp=${param}`;
-  }
-
-  // 3. Web fallback
-  try {
-    const origin = window.location.origin;
-    const pathname = window.location.pathname;
-    const url = new URL(pathname, origin);
-    url.searchParams.set("queue", subject);
-    return url.toString();
-  } catch {
-    return `?queue=${encodeURIComponent(subject)}`;
-  }
+export function generateQueueDeepLink(subject: string): string {
+  const url = getMiniAppUrl();
+  url.searchParams.set("startapp", encodeQueueParam(subject));
+  return url.toString();
 }
 
 /**
@@ -189,44 +183,37 @@ export async function copyQueueLink(subject: string): Promise<string> {
   textArea.focus();
   textArea.select();
   try {
-    document.execCommand("copy");
+    if (!document.execCommand("copy")) throw new Error("Clipboard copy failed");
   } finally {
     document.body.removeChild(textArea);
   }
   return link;
 }
 
-/**
- * Shares the queue link via native Telegram share or Web Share API.
- */
-export async function shareQueueLink(
-  subject: string,
-  title?: string
-): Promise<void> {
-  const link = generateQueueDeepLink(subject);
-  const shareText = title ? `Очередь: ${title}` : "Очередь";
+export interface QueueShareDetails {
+  subject: string;
+  subjectName: string;
+  queueType?: string | null;
+  isNew?: boolean;
+}
+
+export function getQueueShareMessage(queue: QueueShareDetails) {
+  return {
+    title: queue.isNew ? "Новая очередь!" : "Очередь",
+    description: [queue.subjectName, queue.queueType].filter(Boolean).join(" • "),
+    url: generateQueueDeepLink(queue.subject),
+  };
+}
+
+export function shareQueueLink({ title, description, url }: ReturnType<typeof getQueueShareMessage>) {
+  const shareUrl = new URL("https://t.me/share/url");
+  shareUrl.searchParams.set("url", url);
+  shareUrl.searchParams.set("text", `${title}\n${description}`);
 
   const app = tg();
-  if (app && typeof app.openTelegramLink === "function") {
-    const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(
-      link
-    )}&text=${encodeURIComponent(shareText)}`;
-    app.openTelegramLink(tgShareUrl);
-    return;
+  if (app?.openTelegramLink) {
+    app.openTelegramLink(shareUrl.toString());
+  } else {
+    window.open(shareUrl.toString(), "_blank", "noopener,noreferrer");
   }
-
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: shareText,
-        text: shareText,
-        url: link,
-      });
-      return;
-    } catch {
-      // Aborted or cancelled
-    }
-  }
-
-  await copyQueueLink(subject);
 }

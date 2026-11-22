@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RetryBanner } from '@/components/ui/retry-banner';
 import { haptic } from '@/lib/telegram';
-import { copyQueueLink } from '@/lib/deepLink';
+import type { QueueShareDetails } from '@/lib/deepLink';
 import { useUserStore } from '@/store/userStore';
 import {
   useQueuesList,
@@ -107,6 +107,7 @@ interface QueueSlotsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRequestSwap: (targetPos: number, candidateName: string) => void;
+  onShare: (queue: QueueShareDetails) => void;
   initialMeta?: QueueMetaInfo;
 }
 
@@ -115,6 +116,7 @@ export function QueueSlotsModal({
   isOpen,
   onClose,
   onRequestSwap,
+  onShare,
   initialMeta,
 }: QueueSlotsModalProps) {
   const { user } = useUserStore();
@@ -400,19 +402,13 @@ export function QueueSlotsModal({
                   size="sm"
                   variant="ghost"
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
-                  onClick={async () => {
+                  onClick={() => {
                     if (!subject) return;
-                    try {
-                      await copyQueueLink(subject);
-                      haptic.light();
-                      toast.success('Ссылка на очередь скопирована');
-                    } catch {
-                      haptic.error();
-                      toast.error('Не удалось скопировать ссылку');
-                    }
+                    haptic.selection();
+                    onShare({ subject, subjectName: subjectName || subject, queueType });
                   }}
-                  title="Скопировать ссылку"
-                  aria-label="Скопировать ссылку"
+                  title="Поделиться очередью"
+                  aria-label="Поделиться очередью"
                 >
                   <ShareNetwork size={16} />
                 </Button>
