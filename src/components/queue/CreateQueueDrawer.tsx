@@ -90,8 +90,8 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
     if (!alreadyExists) {
       try {
         await createSubjectMutation.mutateAsync(finalSubject);
-      } catch (err) {
-        console.warn('Auto-register subject error:', err);
+      } catch {
+        return;
       }
     }
 
@@ -338,7 +338,11 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
           <Button
             variant="default"
             onClick={handleCreate}
-            disabled={createQueueMutation.isPending || !isFormValid}
+            disabled={
+              createQueueMutation.isPending ||
+              createSubjectMutation.isPending ||
+              !isFormValid
+            }
             disabledReason={
               !subjectName
                 ? 'Сначала выберите предмет'
@@ -352,7 +356,9 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
             }
             className="w-full rounded-2xl h-12 text-sm font-semibold gap-1.5"
           >
-            {createQueueMutation.isPending ? (
+            {createSubjectMutation.isPending ? (
+              'Добавление предмета...'
+            ) : createQueueMutation.isPending ? (
               'Создание...'
             ) : (
               <>
