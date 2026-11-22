@@ -117,7 +117,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         } else {
           set({
             user: null,
-            error: tgUser ? "\u0414\u0430\u043d\u043d\u044b\u0435 Telegram \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c." : null,
+            error: tgUser ? "Данные Telegram не удалось подтвердить." : null,
             isLoading: false,
           });
         }
@@ -128,7 +128,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       if (tgUser) {
         set({
           user: null,
-          error: "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 Telegram. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435.",
+          error: "Не удалось войти через Telegram. Проверьте подключение и повторите.",
           isLoading: false,
         });
       } else {
