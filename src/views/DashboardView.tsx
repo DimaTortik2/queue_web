@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Plus, MagnifyingGlass, SortAscending } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RetryBanner } from '@/components/ui/retry-banner';
-import { haptic, getTelegramStartParam } from '@/lib/telegram';
+import { haptic } from '@/lib/telegram';
 import { resolveQueueSubject } from '@/lib/deepLink';
 import {
   useQueuesList,
@@ -18,7 +18,12 @@ import { SwapRequestDrawer } from '@/components/queue/SwapRequestDrawer';
 import { CreateQueueDrawer } from '@/components/queue/CreateQueueDrawer';
 import { QueueLogo } from '@/components/ui/QueueLogo';
 
-export function DashboardView() {
+interface DashboardViewProps {
+  queueStartParam: string | null;
+  onQueueStartParamHandled: () => void;
+}
+
+export function DashboardView({ queueStartParam, onQueueStartParamHandled }: DashboardViewProps) {
   const { user } = useUserStore();
   const { togglePinSubject, isPinned } = usePreferencesStore();
 
@@ -85,21 +90,15 @@ export function DashboardView() {
     }
   }, [selectedSubjectFilter, activeSubjects]);
 
-  // Auto-open queue drawer when app is launched via Telegram startapp deep link
-  const hasHandledDeepLink = useRef(false);
+  // Hashed links wait for the queue list before being consumed.
   useEffect(() => {
-    if (hasHandledDeepLink.current) return;
-
-    const rawParam = getTelegramStartParam();
-    if (!rawParam) return;
-
-    const resolved = resolveQueueSubject(rawParam, allQueues);
+    const resolved = resolveQueueSubject(queueStartParam, queuesData?.queues);
     if (resolved) {
-      hasHandledDeepLink.current = true;
+      onQueueStartParamHandled();
       setSelectedQueueSubject(resolved);
       setIsSlotsModalOpen(true);
     }
-  }, [allQueues]);
+  }, [queueStartParam, queuesData?.queues, onQueueStartParamHandled]);
 
   const userPositionsMap = useMemo(() => {
     const map = new Map<string, number>();

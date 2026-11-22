@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
@@ -8,7 +8,7 @@ import {
 } from "@phosphor-icons/react";
 import { QueueNavIcon } from "@/components/ui/QueueLogo";
 
-import { initTelegramApp, haptic } from "@/lib/telegram";
+import { getTelegramStartParam, initTelegramApp, haptic } from "@/lib/telegram";
 import { useUserStore } from "@/store/userStore";
 import { useNotificationStore } from "@/store/notificationStore";
 import { usePreferencesStore, applyTheme, applyAccentColor } from "@/store/preferencesStore";
@@ -89,6 +89,8 @@ function AppContent() {
   const { activeSwapProposal, setActiveSwapProposal, setPendingIncomingCount } = useNotificationStore();
   const { user, isLoading, error, initUser } = useUserStore();
   const { disableSwapPopups } = usePreferencesStore();
+  const [queueStartParam, setQueueStartParam] = useState(getTelegramStartParam);
+  const clearQueueStartParam = useCallback(() => setQueueStartParam(null), []);
 
   const { data: incomingSwapsData } = useIncomingSwaps('all', user?.tg_id);
 
@@ -141,7 +143,15 @@ function AppContent() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground antialiased font-sans">
       <Routes>
-        <Route path="/" element={<DashboardView />} />
+        <Route
+          path="/"
+          element={
+            <DashboardView
+              queueStartParam={queueStartParam}
+              onQueueStartParamHandled={clearQueueStartParam}
+            />
+          }
+        />
         <Route path="/requests" element={<RequestsView />} />
         <Route path="/profile" element={<ProfileView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
