@@ -100,6 +100,7 @@ export function CreateQueueDrawer({ isOpen, onClose }: CreateQueueDrawerProps) {
         subject_name: finalSubject,
         queue_type: finalType,
         created_by_tg_id: user.tg_id,
+        total_positions: maxPositions,
         auto_delete_at: autoDeleteAt,
       },
       {
