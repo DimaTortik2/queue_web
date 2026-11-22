@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { UserResponse } from "@/types";
-import { getTelegramUser } from "@/lib/telegram";
-import { api } from "@/services/api";
+import { getTelegramInitData, getTelegramUser } from "@/lib/telegram";
+import { ApiError, api } from "@/services/api";
 
 interface UserState {
   user: UserResponse | null;
@@ -46,14 +46,15 @@ export const useUserStore = create<UserState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const tgUser = getTelegramUser();
+      const initData = getTelegramInitData();
 
-      if (tgUser) {
+      if (tgUser && initData) {
         let remoteUser: UserResponse | null = null;
         try {
           // 1. Проверяем, существует ли уже пользователь в базе
           remoteUser = await api.getUserByTgId(tgUser.id);
-        } catch {
-          // Пользователь еще не создан в БД (404)
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 404) throw error;
           remoteUser = null;
         }
 
@@ -77,9 +78,7 @@ export const useUserStore = create<UserState>((set, get) => ({
         const isLocalDev =
           import.meta.env.DEV ||
           window.location.hostname === "localhost" ||
-          window.location.hostname === "127.0.0.1" ||
-          urlParams.has("dev") ||
-          urlParams.has("user");
+          window.location.hostname === "127.0.0.1";
 
         if (isLocalDev) {
           // Локальная разработка: поддержка нескольких тестовых пользователей для обмена
@@ -116,8 +115,11 @@ export const useUserStore = create<UserState>((set, get) => ({
             set({ user: devUser, isLoading: false });
           }
         } else {
-          // В продакшене/обычном браузере: не логинимся под фейковым юзером
-          set({ user: null, isLoading: false });
+          set({
+            user: null,
+            error: tgUser ? "\u0414\u0430\u043d\u043d\u044b\u0435 Telegram \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044c." : null,
+            isLoading: false,
+          });
         }
       }
     } catch (err: unknown) {
@@ -125,13 +127,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       const tgUser = getTelegramUser();
       if (tgUser) {
         set({
-          user: {
-            id: 0,
-            name: tgUser.first_name,
-            tg_id: tgUser.id,
-            photo_url: tgUser.photo_url || null,
-            role: "student",
-          },
+          user: null,
+          error: "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u043e\u0439\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 Telegram. \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u0435 \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435.",
           isLoading: false,
         });
       } else {
