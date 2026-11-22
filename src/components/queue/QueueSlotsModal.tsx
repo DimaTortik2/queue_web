@@ -744,7 +744,7 @@ export function QueueSlotsModal({
               </p>
             </div>
 
-            <DrawerFooter className="px-6 pt-2 pb-10 flex flex-col gap-2.5">
+            <DrawerFooter className="px-6 pt-2 flex flex-col gap-2.5">
               <Button
                 variant="default"
                 className="w-full rounded-2xl h-12 text-sm font-semibold gap-2"

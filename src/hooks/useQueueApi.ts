@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/services/api";
-import { haptic } from "@/lib/telegram";
+import { getTelegramInitData, haptic } from "@/lib/telegram";
 import { sound } from "@/lib/sound";
 import {
   UserDto,
@@ -150,6 +150,18 @@ export function useSubjectsList(search?: string) {
     placeholderData: (prev) => prev,
     staleTime: 1000 * 10,
   });
+}
+
+export function useCanManageSubjects(tgId: number | undefined) {
+  const enabled = Boolean(tgId && getTelegramInitData());
+  const { data, isSuccess } = useQuery({
+    queryKey: ["auth", "me", tgId],
+    queryFn: api.getAuthMe,
+    enabled,
+    retry: false,
+  });
+
+  return enabled && isSuccess && data?.tg_id === tgId && data?.is_admin === true;
 }
 
 export function useIncomingSwaps(subject: string | null, tgId: number | undefined) {

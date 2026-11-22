@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   PencilSimple,
   Check,
+  CaretRight,
   X,
   Sun,
   Moon,
@@ -14,8 +15,9 @@ import {
 import { useUserStore } from '@/store/userStore';
 import {
   usePreferencesStore,
-  DEFAULT_ACCENT_HEX,
+  normalizeAccentHex,
 } from '@/store/preferencesStore';
+import { AccentColorDrawer } from '@/components/profile/AccentColorDrawer';
 import { Button } from '@/components/ui/button';
 import { SlotAvatar } from '@/components/ui/SlotAvatar';
 import { haptic } from '@/lib/telegram';
@@ -27,9 +29,7 @@ export function ProfileView() {
     theme,
     setTheme,
     accentMode,
-    setAccentMode,
     customColor,
-    setCustomColor,
     hapticsEnabled,
     toggleHaptics,
     soundsEnabled,
@@ -41,16 +41,10 @@ export function ProfileView() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
-
-  const colorInputRef = useRef<HTMLInputElement>(null);
-
-  const handleCustomTileClick = () => {
-    haptic.selection();
-    if (accentMode !== 'custom') {
-      setAccentMode('custom');
-    }
-    colorInputRef.current?.click();
-  };
+  const [isAccentDrawerOpen, setIsAccentDrawerOpen] = useState(false);
+  const accentLabel = accentMode === 'custom'
+    ? normalizeAccentHex(customColor)?.toUpperCase() ?? 'По умолчанию'
+    : 'По умолчанию';
 
   const handleStartEditName = () => {
     haptic.selection();
@@ -201,63 +195,20 @@ export function ProfileView() {
             Цвет акцента
           </span>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            {/* Default purple */}
-            <button
-              type="button"
-              onClick={() => {
-                haptic.selection();
-                setAccentMode('default');
-              }}
-              style={{
-                borderBottomColor:
-                  accentMode === 'default'
-                    ? DEFAULT_ACCENT_HEX
-                    : `${DEFAULT_ACCENT_HEX}50`,
-                backgroundColor:
-                  accentMode === 'default' ? `${DEFAULT_ACCENT_HEX}20` : undefined,
-              }}
-              className={`flex items-center justify-center p-3.5 rounded-xl text-xs font-semibold transition-all border-0 border-b-4 outline-none select-none active:scale-[0.98] ${
-                accentMode === 'default'
-                  ? 'text-foreground font-bold shadow-sm'
-                  : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <span>По умолчанию</span>
-            </button>
-
-            {/* Custom user color */}
-            <input
-              ref={colorInputRef}
-              type="color"
-              value={customColor}
-              onChange={(e) => {
-                setCustomColor(e.target.value);
-              }}
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-            />
-            <button
-              type="button"
-              onClick={handleCustomTileClick}
-              style={{
-                borderBottomColor:
-                  accentMode === 'custom'
-                    ? customColor
-                    : `${customColor}70`,
-                backgroundColor:
-                  accentMode === 'custom' ? `${customColor}20` : undefined,
-              }}
-              className={`relative flex items-center justify-center p-3.5 rounded-xl text-xs font-semibold transition-all border-0 border-b-4 outline-none select-none cursor-pointer active:scale-[0.98] ${
-                accentMode === 'custom'
-                  ? 'text-foreground font-bold shadow-sm'
-                  : 'bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80'
-              }`}
-            >
-              <span className="font-mono text-xs uppercase tracking-wider">{customColor}</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={`Цвет акцента, ${accentLabel}`}
+            onClick={() => {
+              haptic.selection();
+              setIsAccentDrawerOpen(true);
+            }}
+            className="tap-press flex min-h-12 w-full items-center gap-3 rounded-xl bg-secondary px-3.5 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-secondary/80"
+          >
+            <span aria-hidden="true" className="h-6 w-6 shrink-0 rounded-full border border-foreground/15 bg-primary" />
+            <span className="flex-1">{accentLabel}</span>
+            <CaretRight aria-hidden="true" size={16} className="text-muted-foreground" />
+          </button>
         </div>
 
         {/* Sub-block 3: Haptics Toggle */}
@@ -386,6 +337,9 @@ export function ProfileView() {
           </button>
         </div>
       </div>
+      {isAccentDrawerOpen && (
+        <AccentColorDrawer onClose={() => setIsAccentDrawerOpen(false)} />
+      )}
     </div>
   );
 }

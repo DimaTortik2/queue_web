@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useUserStore } from '@/store/userStore';
 import {
+  useCanManageSubjects,
   useSubjectsList,
   useCreateSubjectMutation,
   useDeleteSubjectMutation,
@@ -31,13 +32,14 @@ interface CreateQueueDrawerProps {
 
 export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawerProps) {
   const { user } = useUserStore();
+  const canManageSubjects = useCanManageSubjects(isOpen ? user?.tg_id : undefined);
   const { data: subjectsData } = useSubjectsList();
   const createSubjectMutation = useCreateSubjectMutation();
   const deleteSubjectMutation = useDeleteSubjectMutation();
   const createQueueMutation = useCreateQueueMutation();
   const joinMutation = useJoinQueueMutation({ showToast: false });
 
-  const [subjectName, setSubjectName] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState<number | 'custom' | null>(null);
   const [customSubject, setCustomSubject] = useState('');
   const [subjectToDelete, setSubjectToDelete] = useState<{ id: number; name: string } | null>(null);
   const [queueType, setQueueType] = useState('');
@@ -48,22 +50,28 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
   const [isAutoDeleteValid, setIsAutoDeleteValid] = useState<boolean>(true);
 
   const subjects = subjectsData?.subject_list || [];
+  const isCustomSubject = selectedSubject === 'custom';
+  const customSubjectName = canManageSubjects && isCustomSubject ? customSubject.trim() : '';
+  const catalogSubject = isCustomSubject
+    ? subjects.find((s) => s.name.toLowerCase() === customSubjectName.toLowerCase())
+    : subjects.find((s) => s.id === selectedSubject);
+  const finalSubject = catalogSubject?.name ?? customSubjectName;
+  const finalType = queueType.trim();
+  const isFormValid = Boolean(finalSubject && finalType && user?.tg_id && isAutoDeleteValid);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || !canManageSubjects) {
       setSubjectToDelete(null);
     }
-  }, [isOpen]);
+  }, [isOpen, canManageSubjects]);
 
   const handleConfirmDeleteSubject = () => {
-    if (!subjectToDelete) return;
-    const deletingName = subjectToDelete.name;
-    deleteSubjectMutation.mutate(subjectToDelete.id, {
+    if (!canManageSubjects || !subjectToDelete) return;
+    const deletingId = subjectToDelete.id;
+    deleteSubjectMutation.mutate(deletingId, {
       onSuccess: () => {
         haptic.success();
-        if (subjectName === deletingName) {
-          setSubjectName('');
-        }
+        setSelectedSubject((current) => current === deletingId ? null : current);
         setSubjectToDelete(null);
       },
     });
@@ -78,19 +86,10 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
   );
 
   const handleCreate = async () => {
-    const finalSubject = (
-      subjectName === 'custom' ? customSubject : subjectName
-    ).trim();
-    const finalType = queueType.trim();
+    if (!isFormValid || !user?.tg_id) return;
 
-    if (!finalSubject || !finalType || !user?.tg_id || !isAutoDeleteValid)
-      return;
-
-    // Auto-register custom subject in catalog if it doesn't exist yet
-    const alreadyExists = subjects.some(
-      (s) => s.name.toLowerCase() === finalSubject.toLowerCase(),
-    );
-    if (!alreadyExists) {
+    if (!catalogSubject) {
+      if (!canManageSubjects) return;
       try {
         await createSubjectMutation.mutateAsync(finalSubject);
       } catch {
@@ -149,7 +148,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
             showCreatedToast();
           }
           onClose();
-          setSubjectName('');
+          setSelectedSubject(null);
           setCustomSubject('');
           setQueueType('');
           setMaxPositions(30);
@@ -160,12 +159,6 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
       },
     );
   };
-
-  const isFormValid = Boolean(
-    (subjectName === 'custom' ? customSubject.trim() : subjectName.trim()) &&
-    queueType.trim() &&
-    isAutoDeleteValid,
-  );
 
   return (
     <>
@@ -186,7 +179,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
 
             <div className="flex flex-wrap gap-2">
               {subjects.map((s) => {
-                const isSelected = subjectName === s.name;
+                const isSelected = selectedSubject === s.id;
                 return (
                   <div
                     key={s.id}
@@ -200,51 +193,54 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
                       type="button"
                       onClick={() => {
                         haptic.selection();
-                        setSubjectName(s.name);
+                        setSelectedSubject(s.id);
                       }}
-                      className="py-2.5 pl-3.5 pr-1.5 focus:outline-none"
+                      className={`py-2.5 pl-3.5 focus:outline-none ${canManageSubjects ? 'pr-1.5' : 'pr-3.5'}`}
                     >
                       {s.name}
                     </button>
-                    <button
-                      type="button"
-                      title={`Удалить «${s.name}» из подсказок`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        haptic.light();
-                        setSubjectToDelete(s);
-                      }}
-                      className={`p-1.5 mr-1 rounded-lg transition-colors flex items-center justify-center focus:outline-none ${
-                        isSelected
-                          ? 'text-background/60 hover:text-destructive hover:bg-background/20'
-                          : 'text-muted-foreground/60 hover:text-destructive hover:bg-foreground/10'
-                      }`}
-                    >
-                      <X size={12} weight="bold" />
-                    </button>
+                    {canManageSubjects && (
+                      <button
+                        type="button"
+                        title={`Удалить «${s.name}» из подсказок`}
+                        onClick={() => {
+                          haptic.light();
+                          setSubjectToDelete(s);
+                        }}
+                        className={`p-1.5 mr-1 rounded-lg transition-colors flex items-center justify-center focus:outline-none ${
+                          isSelected
+                            ? 'text-background/60 hover:text-destructive hover:bg-background/20'
+                            : 'text-muted-foreground/60 hover:text-destructive hover:bg-foreground/10'
+                        }`}
+                      >
+                        <X size={12} weight="bold" />
+                      </button>
+                    )}
                   </div>
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => {
-                  haptic.selection();
-                  setSubjectName('custom');
-                }}
-                className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                  subjectName === 'custom'
-                    ? 'bg-foreground text-background'
-                    : 'bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                + Свой предмет
-              </button>
+              {canManageSubjects && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic.selection();
+                    setSelectedSubject('custom');
+                  }}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    isCustomSubject
+                      ? 'bg-foreground text-background'
+                      : 'bg-secondary text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  + Свой предмет
+                </button>
+              )}
             </div>
           </div>
 
           {/* Custom Subject Name input if chosen */}
-          {subjectName === 'custom' && (
+          {canManageSubjects && isCustomSubject && (
             <div className="flex flex-col gap-1.5 animate-in fade-in duration-150">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Название предмета
@@ -373,10 +369,10 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
               !isFormValid
             }
             disabledReason={
-              !subjectName
-                ? 'Сначала выберите предмет'
-                : subjectName === 'custom' && !customSubject.trim()
+              !finalSubject
+                ? canManageSubjects && isCustomSubject
                   ? 'Введите название предмета'
+                  : 'Сначала выберите предмет'
                   : !queueType.trim()
                     ? 'Введите тип сдачи'
                     : !isAutoDeleteValid
@@ -409,7 +405,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
     </Drawer>
 
     {/* Delete Subject from Suggestions Confirmation Drawer */}
-    {subjectToDelete && (
+    {canManageSubjects && subjectToDelete && (
       <Drawer
         open={!!subjectToDelete}
         onOpenChange={(open) => {
@@ -438,7 +434,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
             </div>
           </div>
 
-          <DrawerFooter className="px-6 pt-2 pb-10 flex flex-col gap-2.5">
+          <DrawerFooter className="px-6 pt-2 flex flex-col gap-2.5">
             <Button
               variant="destructive"
               className="w-full rounded-2xl h-12 text-sm font-semibold gap-2"

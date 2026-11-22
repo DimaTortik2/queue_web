@@ -77,6 +77,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 }
 
 export const api = {
+  getAuthMe: () => request<{ tg_id: number; is_admin: boolean }>("/api/auth/me"),
+
   // Users
   getUsers: (params?: { search?: string; role?: string; skip?: number; limit?: number }) => {
     const q = new URLSearchParams();

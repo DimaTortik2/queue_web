@@ -6,6 +6,16 @@ export type AccentMode = "default" | "custom";
 
 export const DEFAULT_ACCENT_HEX = "#7c3aed";
 
+export function normalizeAccentHex(value: string): string | null {
+  if (typeof value !== "string") return null;
+
+  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim());
+  if (!match) return null;
+
+  const hex = match[1].toLowerCase();
+  return `#${hex.length === 3 ? hex.replace(/./g, digit => digit.repeat(2)) : hex}`;
+}
+
 export function hexToHsl(hex: string) {
   let cleaned = hex.replace("#", "").trim();
   if (cleaned.length === 3) {
@@ -97,7 +107,10 @@ export const usePreferencesStore = create<PreferencesState>()(
         applyAccentColor(accentMode, get().customColor);
       },
 
-      setCustomColor: (customColor: string) => {
+      setCustomColor: (hex: string) => {
+        const customColor = normalizeAccentHex(hex);
+        if (!customColor) return;
+
         set({ customColor, accentMode: "custom" });
         applyAccentColor("custom", customColor);
       },
@@ -203,7 +216,7 @@ export function applyAccentColor(mode: AccentMode = "default", customHex: string
     root.style.setProperty("--accent-foreground", isDark ? "262 83% 75%" : "262 83% 50%");
     root.style.setProperty("--logo-accent", DEFAULT_ACCENT_HEX);
   } else {
-    const hex = customHex && customHex.startsWith("#") ? customHex : DEFAULT_ACCENT_HEX;
+    const hex = normalizeAccentHex(customHex) ?? DEFAULT_ACCENT_HEX;
     const { h, s, l, isLight } = hexToHsl(hex);
 
     // In dark mode, if user picked a very low lightness color, bump it slightly for visibility
