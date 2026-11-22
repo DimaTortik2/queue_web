@@ -145,12 +145,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   updateUserName: async (name: string) => {
     const { user } = get();
     if (!user) return;
-    try {
-      await api.updateUser(user.tg_id, { name });
-      const updated = await api.getUserByTgId(user.tg_id);
-      set({ user: updated });
-    } catch {
-      set({ user: { ...user, name } });
-    }
+    await api.updateUser(user.tg_id, { name });
+    set({ user: { ...user, name } });
   },
 }));

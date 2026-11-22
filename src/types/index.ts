@@ -139,6 +139,7 @@ export interface QueueCreateDto {
   subject_name: string;
   queue_type: string;
   created_by_tg_id: number;
+  total_positions: number;
   auto_delete_at?: string | null;
 }
 

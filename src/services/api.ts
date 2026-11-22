@@ -28,6 +28,16 @@ import {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
+class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const initData = getTelegramInitData();
 
@@ -55,7 +65,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     } catch {
       // ignore json parse error
     }
-    throw new Error(errorDetail);
+    throw new ApiError(response.status, errorDetail);
   }
 
   // Handle 204 or empty responses
@@ -177,9 +187,11 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }
-    ).catch(async (err) => {
+    ).catch(async (err: unknown) => {
       // Graceful fallback if backend has not reloaded /move endpoint yet
-      if (err.status === 404 || err.message?.includes("404")) {
+      const status = err instanceof ApiError ? err.status : undefined;
+      const message = err instanceof Error ? err.message : String(err);
+      if (status === 404 || message.includes("404")) {
         await api.leaveQueue(subject, { tg_id: data.tg_id, position: 0 });
         return api.joinQueue(subject, data);
       }
