@@ -50,6 +50,9 @@ export interface QueueUserInfo {
 
 export interface QueueResponse {
   subject: string;
+  subject_name?: string;
+  queue_type?: string;
+  queue_date?: string | null;
   queue: QueueUserInfo[];
   total_positions: number;
   taken_positions: number;
@@ -60,6 +63,7 @@ export interface QueueMetaInfo {
   subject: string;
   subject_name: string;
   queue_type: string;
+  queue_date?: string | null;
   created_by_tg_id: number;
   created_by_name?: string | null;
   created_at: string;
@@ -138,9 +142,15 @@ export interface UserDto {
 export interface QueueCreateDto {
   subject_name: string;
   queue_type: string;
+  queue_date: string;
   created_by_tg_id: number;
   total_positions: number;
   auto_delete_at?: string | null;
+}
+
+export interface UpdateQueueDetailsDto {
+  queue_type: string;
+  queue_date: string | null;
 }
 
 export interface KickDto {

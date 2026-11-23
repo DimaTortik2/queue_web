@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { useUserStore } from "@/store/userStore";
-import { useAcceptSwapMutation, useRejectSwapMutation } from "@/hooks/useQueueApi";
+import { useAcceptSwapMutation, useQueueDetail, useRejectSwapMutation } from "@/hooks/useQueueApi";
+import { formatQueueDate } from "@/lib/dateUtils";
 import { SwapRequestInfo } from "@/types";
 
 interface SwapRespondDrawerProps {
@@ -28,6 +29,7 @@ export function SwapRespondDrawer({
 
   const acceptMutation = useAcceptSwapMutation();
   const rejectMutation = useRejectSwapMutation();
+  const { data: queue } = useQueueDetail(isOpen ? request?.subject ?? null : null);
 
   if (!request) return null;
 
@@ -70,6 +72,9 @@ export function SwapRespondDrawer({
   };
 
   const isPending = acceptMutation.isPending || rejectMutation.isPending;
+  const queueLabel = queue?.subject === request.subject && queue.subject_name
+    ? [queue.subject_name, queue.queue_type, formatQueueDate(queue.queue_date)].filter(Boolean).join(' • ')
+    : request.subject.includes(':') ? request.subject.replace(':', ' • ') : 'Очередь';
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -77,9 +82,7 @@ export function SwapRespondDrawer({
         <DrawerHeader>
           <DrawerTitle>Предложение обмена местами</DrawerTitle>
           <DrawerDescription>
-            {request.subject.includes(':')
-              ? request.subject.replace(':', ' • ')
-              : request.subject}
+            {queueLabel}
           </DrawerDescription>
         </DrawerHeader>
 

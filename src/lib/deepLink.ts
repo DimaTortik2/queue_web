@@ -1,4 +1,5 @@
 import { tg } from "./telegram";
+import { formatQueueDate } from "./dateUtils";
 
 /**
  * Encode string to base64url (RFC 4648 §5 without padding)
@@ -194,13 +195,14 @@ export interface QueueShareDetails {
   subject: string;
   subjectName: string;
   queueType?: string | null;
+  queueDate?: string | null;
   isNew?: boolean;
 }
 
 export function getQueueShareMessage(queue: QueueShareDetails) {
   return {
     title: queue.isNew ? "Новая очередь!" : "Очередь",
-    description: [queue.subjectName, queue.queueType].filter(Boolean).join(" • "),
+    description: [queue.subjectName, queue.queueType, formatQueueDate(queue.queueDate)].filter(Boolean).join(" • "),
     url: generateQueueDeepLink(queue.subject),
   };
 }

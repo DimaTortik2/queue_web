@@ -6,6 +6,7 @@ import { sound } from "@/lib/sound";
 import {
   UserDto,
   QueueCreateDto,
+  UpdateQueueDetailsDto,
   KickDto,
   AdvanceQueueDto,
   PauseQueueDto,
@@ -152,7 +153,7 @@ export function useSubjectsList(search?: string) {
   });
 }
 
-export function useCanManageSubjects(tgId: number | undefined) {
+export function useIsTelegramAdmin(tgId: number | undefined) {
   const enabled = Boolean(tgId && getTelegramInitData());
   const { data, isSuccess } = useQuery({
     queryKey: ["auth", "me", tgId],
@@ -558,6 +559,24 @@ export function useCreateQueueMutation() {
       haptic.error();
       sound.error();
       toast.error(err.message || "Ошибка создания очереди");
+    },
+  });
+}
+
+export function useUpdateQueueDetailsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ subject, data }: { subject: string; data: UpdateQueueDetailsDto }) =>
+      api.updateQueueDetails(subject, data),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queueKeys.all });
+      haptic.success();
+      toast.success("Очередь обновлена");
+    },
+    onError: (err: Error) => {
+      haptic.error();
+      toast.error(err.message || "Не удалось сохранить очередь");
     },
   });
 }

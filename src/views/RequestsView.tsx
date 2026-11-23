@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RetryBanner } from '@/components/ui/retry-banner';
 import { haptic } from '@/lib/telegram';
+import { formatQueueDate } from '@/lib/dateUtils';
 import {
   useUserActiveQueues,
   useIncomingSwaps,
@@ -41,6 +42,13 @@ export function RequestsView() {
     }
     return unique;
   }, [userQueues]);
+  const queuesBySubject = new Map(uniqueUserQueues.map((queue) => [queue.subject, queue]));
+
+  const getQueueLabel = (subject: string) => {
+    const queue = queuesBySubject.get(subject);
+    if (!queue) return subject.includes(':') ? subject.replace(':', ' • ') : 'Очередь';
+    return [queue.subject_name, queue.queue_type, formatQueueDate(queue.queue_date)].filter(Boolean).join(' • ');
+  };
 
   // "all" by default, or specific selected subject
   const currentSubject = selectedSubject || 'all';
@@ -187,7 +195,7 @@ export function RequestsView() {
                       : 'bg-secondary text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>{q.queue_type || q.subject}</span>
+                  <span>{[q.queue_type || q.subject_name, formatQueueDate(q.queue_date)].filter(Boolean).join(' • ')}</span>
                   {isSelected && sortOrder === 'asc' && (
                     <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
                   )}
@@ -279,7 +287,7 @@ export function RequestsView() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      {r.subject}
+                      {getQueueLabel(r.subject)}
                     </span>
                     {renderStatusBadge(r.status)}
                   </div>
@@ -407,7 +415,7 @@ export function RequestsView() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {r.subject}
+                    {getQueueLabel(r.subject)}
                   </span>
                   {renderStatusBadge(r.status)}
                 </div>

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Plus, MagnifyingGlass, SortAscending } from '@phosphor-icons/react';
+import { Plus, MagnifyingGlass, SortAscending, UserCircle } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { Button } from '@/components/ui/button';
@@ -26,9 +26,10 @@ interface DashboardViewProps {
 
 export function DashboardView({ queueStartParam, onQueueStartParamHandled }: DashboardViewProps) {
   const { user } = useUserStore();
-  const { togglePinSubject, isPinned } = usePreferencesStore();
+  const pinnedSubjects = usePreferencesStore((state) => state.pinnedSubjects);
 
   const [search, setSearch] = useState('');
+  const [showMyQueues, setShowMyQueues] = useState(false);
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<
     string | null
   >(null);
@@ -55,11 +56,21 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
     search: search.trim() || undefined,
   });
 
-  const { data: userQueuesData } = useUserActiveQueues(user?.tg_id);
+  const {
+    data: userQueuesData,
+    isLoading: isLoadingUserQueues,
+    isError: isErrorUserQueues,
+    refetch: refetchUserQueues,
+  } = useUserActiveQueues(user?.tg_id);
   const { data: subjectsData } = useSubjectsList();
 
-  const allQueues = queuesData?.queues || [];
-  const userQueues = userQueuesData?.queues || [];
+  const allQueues = useMemo(() => {
+    const positions = new Map(userQueuesData?.queues.map((queue) => [queue.subject, queue.my_position]));
+    return (queuesData?.queues ?? []).map((queue) => ({
+      ...queue,
+      my_position: userQueuesData ? positions.get(queue.subject) ?? null : queue.my_position ?? null,
+    }));
+  }, [queuesData?.queues, userQueuesData]);
 
   // Only subjects that currently have at least one active queue created
   const activeSubjects = useMemo(() => {
@@ -102,27 +113,18 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
     }
   }, [queueStartParam, queuesData?.queues, onQueueStartParamHandled]);
 
-  const userPositionsMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const q of userQueues) {
-      if (q.my_position !== undefined && q.my_position !== null) {
-        map.set(q.subject, q.my_position);
-      }
-    }
-    return map;
-  }, [userQueues]);
-
-  // Instant filtering by subject without network refetch
   const filteredQueues = useMemo(() => {
-    if (!selectedSubjectFilter) return allQueues;
-    return allQueues.filter((q) => q.subject_name === selectedSubjectFilter);
-  }, [allQueues, selectedSubjectFilter]);
+    return allQueues.filter((queue) => (
+      (!showMyQueues || queue.my_position !== null) &&
+      (!selectedSubjectFilter || queue.subject_name === selectedSubjectFilter)
+    ));
+  }, [allQueues, selectedSubjectFilter, showMyQueues]);
 
   // Sort: pinned first, then by date (newest first by default, or inverted)
   const displayedQueues = useMemo(() => {
     return [...filteredQueues].sort((a, b) => {
-      const aPinned = isPinned(a.subject);
-      const bPinned = isPinned(b.subject);
+      const aPinned = pinnedSubjects.includes(a.subject);
+      const bPinned = pinnedSubjects.includes(b.subject);
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
 
@@ -134,7 +136,7 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
       }
       return (a.subject || '').localeCompare(b.subject || '', 'ru');
     });
-  }, [filteredQueues, isPinned, sortOrder]);
+  }, [filteredQueues, pinnedSubjects, sortOrder]);
 
   const handleSelectFilter = useCallback(
     (subjectName: string | null) => {
@@ -166,19 +168,16 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
 
   const handleCloseSlotsModal = useCallback(() => setIsSlotsModalOpen(false), []);
 
-  const slotsModalInitialMeta = useMemo(() => {
-    const meta = displayedQueues.find(
-      (q) => q.subject === selectedQueueSubject
-    );
-    if (!meta) return undefined;
-    const pos = selectedQueueSubject
-      ? userPositionsMap.get(selectedQueueSubject)
-      : null;
-    return {
-      ...meta,
-      my_position: pos !== undefined ? pos : meta.my_position,
-    };
-  }, [displayedQueues, selectedQueueSubject, userPositionsMap]);
+  const slotsModalInitialMeta = allQueues.find((queue) => queue.subject === selectedQueueSubject);
+  const membershipUnavailable = showMyQueues && isErrorUserQueues && !userQueuesData;
+  const isLoadingList = (isLoadingQueues && !queuesData) || (showMyQueues && isLoadingUserQueues);
+  const hasNoMemberships = showMyQueues && userQueuesData?.queues.length === 0;
+  const emptyTitle = hasNoMemberships ? 'Вы пока ни в одной очереди' : 'Очереди не найдены';
+  const emptyHint = hasNoMemberships
+    ? 'Снимите фильтр, чтобы выбрать очередь и занять место.'
+    : search.trim() || selectedSubjectFilter
+      ? 'Измените поиск или выберите другой предмет.'
+      : showMyQueues ? null : 'Создайте очередь с помощью кнопки выше.';
 
   return (
     <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none native-page-enter">
@@ -222,46 +221,66 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
         />
       </div>
 
-      {/* Subject Filter Pills (Touch Carousel strictly within content bounds) */}
-      {(allQueues.length > 0 || activeSubjects.length > 0) && (
-        <div className="w-full overflow-hidden">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
-            <button
-              onClick={() => handleSelectFilter(null)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
-                selectedSubjectFilter === null
-                  ? 'bg-foreground text-background shadow-sm'
-                  : 'bg-secondary text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <span>Все</span>
-              {selectedSubjectFilter === null && sortOrder === 'asc' && (
-                <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
-              )}
-            </button>
-            {activeSubjects.map((s) => {
-              const isSelected = selectedSubjectFilter === s.name;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => handleSelectFilter(s.name)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
-                    isSelected
-                      ? 'bg-foreground text-background shadow-sm'
-                      : 'bg-secondary text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>{s.name}</span>
-                  {isSelected && sortOrder === 'asc' && (
-                    <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
-                  )}
-                </button>
-              );
-            })}
-            <div className="shrink-0 w-4" />
+      <div className="flex w-full items-center gap-2">
+        <button
+          type="button"
+          aria-pressed={showMyQueues}
+          onClick={() => {
+            haptic.selection();
+            setShowMyQueues((current) => !current);
+          }}
+          className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-all duration-150 tap-press active:scale-95 ${
+            showMyQueues
+              ? 'bg-accent text-accent-foreground ring-1 ring-inset ring-primary/30'
+              : 'bg-secondary text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <UserCircle size={16} weight={showMyQueues ? 'fill' : 'bold'} />
+          Мои очереди
+        </button>
+        {(activeSubjects.length > 0 || selectedSubjectFilter) && (
+          <div className="min-w-0 flex-1 border-l border-border pl-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
+              <button
+                type="button"
+                aria-pressed={selectedSubjectFilter === null}
+                onClick={() => handleSelectFilter(null)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+                  selectedSubjectFilter === null
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <span>Все предметы</span>
+                {selectedSubjectFilter === null && sortOrder === 'asc' && (
+                  <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+                )}
+              </button>
+              {activeSubjects.map((s) => {
+                const isSelected = selectedSubjectFilter === s.name;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => handleSelectFilter(s.name)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+                      isSelected
+                        ? 'bg-foreground text-background shadow-sm'
+                        : 'bg-secondary text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <span>{s.name}</span>
+                    {isSelected && sortOrder === 'asc' && (
+                      <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Queues List */}
       <div className="flex flex-col gap-4">
@@ -270,7 +289,9 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
             message="Не удалось загрузить очереди"
             onRetry={() => refetchQueues()}
           />
-        ) : isLoadingQueues && !queuesData ? (
+        ) : membershipUnavailable ? (
+          <RetryBanner message="Не удалось загрузить ваши очереди" onRetry={() => refetchUserQueues()} />
+        ) : isLoadingList ? (
           <div className="flex flex-col gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <div
@@ -296,7 +317,6 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
           </div>
         ) : displayedQueues.length > 0 ? (
           displayedQueues.map((q) => {
-            const myPos = userPositionsMap.get(q.subject) ?? (q.my_position ?? null);
             const isCreator = user?.tg_id
               ? q.created_by_tg_id === user.tg_id
               : false;
@@ -305,13 +325,6 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
                 key={q.subject}
                 queue={q}
                 isCreator={isCreator}
-                myPosition={myPos}
-                isPinned={isPinned(q.subject)}
-                onTogglePin={(e) => {
-                  e.stopPropagation();
-                  haptic.selection();
-                  togglePinSubject(q.subject);
-                }}
                 onClick={() => handleOpenQueue(q.subject)}
               />
             );
@@ -319,17 +332,13 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
         ) : (
           <div className="py-20 flex flex-col items-center justify-center text-center gap-3">
             <div className="w-16 h-16 rounded-2xl bg-card flex items-center justify-center text-muted-foreground/40">
-              <MagnifyingGlass size={32} weight="bold" />
+              {hasNoMemberships ? <UserCircle size={32} weight="bold" /> : <MagnifyingGlass size={32} weight="bold" />}
             </div>
             <div className="flex flex-col gap-1 max-w-xs">
               <span className="text-sm font-semibold text-foreground">
-                Очереди не найдены
+                {emptyTitle}
               </span>
-              <span className="text-xs text-muted-foreground">
-                {search
-                  ? 'Попробуйте изменить запрос поиска'
-                  : 'Создайте первую очередь нажав кнопку выше'}
-              </span>
+              {emptyHint && <span className="text-xs text-muted-foreground">{emptyHint}</span>}
             </div>
           </div>
         )}

@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useUserStore } from '@/store/userStore';
 import {
-  useCanManageSubjects,
+  useIsTelegramAdmin,
   useSubjectsList,
   useCreateSubjectMutation,
   useDeleteSubjectMutation,
@@ -23,6 +23,7 @@ import {
 import { haptic } from '@/lib/telegram';
 import type { QueueShareDetails } from '@/lib/deepLink';
 import { AutoDeleteSelector } from '@/components/queue/AutoDeleteSelector';
+import { QueueDetailsFields } from '@/components/queue/QueueDetailsFields';
 
 interface CreateQueueDrawerProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ interface CreateQueueDrawerProps {
 
 export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawerProps) {
   const { user } = useUserStore();
-  const canManageSubjects = useCanManageSubjects(isOpen ? user?.tg_id : undefined);
+  const canManageSubjects = useIsTelegramAdmin(isOpen ? user?.tg_id : undefined);
   const { data: subjectsData } = useSubjectsList();
   const createSubjectMutation = useCreateSubjectMutation();
   const deleteSubjectMutation = useDeleteSubjectMutation();
@@ -43,6 +44,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
   const [customSubject, setCustomSubject] = useState('');
   const [subjectToDelete, setSubjectToDelete] = useState<{ id: number; name: string } | null>(null);
   const [queueType, setQueueType] = useState('');
+  const [queueDate, setQueueDate] = useState('');
   const [maxPositions, setMaxPositions] = useState<number>(30);
   const [chosenPosition, setChosenPosition] = useState<number>(1);
   const [joinImmediately, setJoinImmediately] = useState<boolean>(true);
@@ -57,7 +59,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
     : subjects.find((s) => s.id === selectedSubject);
   const finalSubject = catalogSubject?.name ?? customSubjectName;
   const finalType = queueType.trim();
-  const isFormValid = Boolean(finalSubject && finalType && user?.tg_id && isAutoDeleteValid);
+  const isFormValid = Boolean(finalSubject && finalType && queueDate && user?.tg_id && isAutoDeleteValid);
 
   useEffect(() => {
     if (!isOpen || !canManageSubjects) {
@@ -101,20 +103,21 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
       {
         subject_name: finalSubject,
         queue_type: finalType,
+        queue_date: queueDate,
         created_by_tg_id: user.tg_id,
         total_positions: maxPositions,
         auto_delete_at: autoDeleteAt,
       },
       {
-        onSuccess: () => {
-          const fullSubjectKey = `${finalSubject}:${finalType}`;
+        onSuccess: ({ data: queue }) => {
           const shareAction = {
             label: 'Поделиться',
             onClick: () =>
               onShare({
-                subject: fullSubjectKey,
-                subjectName: finalSubject,
-                queueType: finalType,
+                subject: queue.subject,
+                subjectName: queue.subject_name,
+                queueType: queue.queue_type,
+                queueDate: queue.queue_date,
                 isNew: true,
               }),
           };
@@ -133,7 +136,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
           ) {
             joinMutation.mutate(
               {
-                subject: fullSubjectKey,
+                subject: queue.subject,
                 data: {
                   tg_id: user.tg_id,
                   position: chosenPosition,
@@ -151,6 +154,7 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
           setSelectedSubject(null);
           setCustomSubject('');
           setQueueType('');
+          setQueueDate('');
           setMaxPositions(30);
           setChosenPosition(1);
           setAutoDeleteAt(null);
@@ -256,19 +260,13 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
             </div>
           )}
 
-          {/* Queue Type Input */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Тип сдачи
-            </label>
-            <input
-              type="text"
-              placeholder="Лаба 1..."
-              value={queueType}
-              onChange={(e) => setQueueType(e.target.value)}
-              className="w-full bg-secondary rounded-xl px-4 py-3 text-sm font-medium focus:bg-card focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground/50 border-0 outline-none"
-            />
-          </div>
+          <QueueDetailsFields
+            title={queueType}
+            onTitleChange={setQueueType}
+            date={queueDate}
+            onDateChange={setQueueDate}
+            dateRequired
+          />
 
           {/* Max Positions Carousel Selection */}
           <div className="flex flex-col gap-2">
@@ -373,11 +371,13 @@ export function CreateQueueDrawer({ isOpen, onClose, onShare }: CreateQueueDrawe
                 ? canManageSubjects && isCustomSubject
                   ? 'Введите название предмета'
                   : 'Сначала выберите предмет'
-                  : !queueType.trim()
-                    ? 'Введите тип сдачи'
-                    : !isAutoDeleteValid
-                      ? 'Выберите корректное время удаления'
-                      : undefined
+                  : !finalType
+                    ? 'Введите название очереди'
+                    : !queueDate
+                      ? 'Укажите дату очереди'
+                      : !isAutoDeleteValid
+                        ? 'Выберите корректное время удаления'
+                        : undefined
             }
             className="w-full rounded-2xl h-12 text-sm font-semibold gap-1.5"
           >

@@ -1,3 +1,17 @@
+const queueDateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: 'UTC',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+export function formatQueueDate(value?: string | null): string | null {
+  if (!value) return null;
+  const day = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(day.getTime()) ? null : queueDateFormatter.format(day);
+}
+
 /**
  * Formats an ISO expiration date string into clean MSK time format.
  * - Today: "22:00" or "00:30"

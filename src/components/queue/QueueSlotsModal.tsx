@@ -5,6 +5,7 @@ import {
   Trash,
   X,
   ShareNetwork,
+  CalendarBlank,
   ArrowsLeftRight,
   UserPlus,
   PencilSimple,
@@ -28,6 +29,7 @@ import { useUserStore } from '@/store/userStore';
 import {
   useQueuesList,
   useQueueDetail,
+  useIsTelegramAdmin,
   useMyPosition,
   useJoinQueueMutation,
   useLeaveQueueMutation,
@@ -39,8 +41,10 @@ import {
 import { useRoomSubscription } from '@/providers/WebSocketProvider';
 import { DirectSwapDrawer } from '@/components/queue/DirectSwapDrawer';
 import { SlotAvatar } from '@/components/ui/SlotAvatar';
-import { formatAutoDeleteTime, parseMskIso } from '@/lib/dateUtils';
+import { formatAutoDeleteTime, formatQueueDate, parseMskIso } from '@/lib/dateUtils';
 import { GoogleCalendarTimeDrawer } from '@/components/queue/GoogleCalendarTimeDrawer';
+import { QueuePinButton } from '@/components/queue/QueuePinButton';
+import { EditQueueDetailsDrawer } from '@/components/queue/EditQueueDetailsDrawer';
 
 // ── Memoized Slot Button to avoid re-rendering all 30 on every state change ──
 interface SlotButtonProps {
@@ -199,10 +203,13 @@ export function QueueSlotsModal({
   const updateAutoDeleteMutation = useUpdateAutoDeleteMutation();
 
   const [isAutoDeleteDrawerOpen, setIsAutoDeleteDrawerOpen] = useState(false);
+  const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
 
   const isCreator = user?.tg_id
     ? currentMeta?.created_by_tg_id === user.tg_id
     : false;
+  const isAdmin = useIsTelegramAdmin(isOpen && !isCreator ? user?.tg_id : undefined);
+  const canEditDetails = isCreator || (isAdmin && Boolean(currentMeta || queueData?.subject === subject));
 
   const mySlotInQueue = useMemo(() => {
     if (!queueData?.queue || !user?.tg_id) return null;
@@ -347,16 +354,21 @@ export function QueueSlotsModal({
   }, [subject, user?.tg_id, selectedSlotForKick, kickMutation]);
 
   const colonIdx = subject ? subject.indexOf(':') : -1;
+  const queueDetails = queueData?.subject === subject ? queueData : undefined;
   const subjectName =
     currentMeta?.subject_name ||
-    (subject && colonIdx !== -1 ? subject.slice(0, colonIdx).trim() : null);
+    queueDetails?.subject_name ||
+    (subject && colonIdx !== -1 ? subject.slice(0, colonIdx).trim() : 'Очередь');
   const autoDeleteLabel = formatAutoDeleteTime(currentMeta?.auto_delete_at);
   const parsedAutoDelete = currentMeta?.auto_delete_at
     ? parseMskIso(currentMeta.auto_delete_at)
     : null;
   const queueType =
     currentMeta?.queue_type ||
+    queueDetails?.queue_type ||
     (subject && colonIdx !== -1 ? subject.slice(colonIdx + 1).trim() : null);
+  const queueDate = currentMeta ? currentMeta.queue_date : queueDetails?.queue_date;
+  const queueDateLabel = formatQueueDate(queueDate);
 
   // Build a lookup Map once, then generate slots in O(n) instead of O(n×m)
   const slots = useMemo(() => {
@@ -389,15 +401,21 @@ export function QueueSlotsModal({
 
   return (
     <>
-      <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Drawer open={isOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsDetailsDrawerOpen(false);
+          onClose();
+        }
+      }}>
         <DrawerContent className="max-w-lg mx-auto rounded-t-3xl border-0 p-0 overflow-hidden w-full">
           <DrawerHeader className="px-6 pt-6 pb-2 w-full min-w-0 max-w-full overflow-hidden !flex !flex-col">
             <div className="flex items-center justify-between gap-3 w-full min-w-0">
               <DrawerTitle className="text-xl font-bold tracking-tight text-foreground truncate text-left flex-1 min-w-0">
-                {subjectName || subject}
+                {subjectName}
               </DrawerTitle>
               <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                 {isCreator && <Badge variant="subtle">Создатель</Badge>}
+                {subject && <QueuePinButton subject={subject} className="h-8 w-8 rounded-xl" />}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -405,7 +423,7 @@ export function QueueSlotsModal({
                   onClick={() => {
                     if (!subject) return;
                     haptic.selection();
-                    onShare({ subject, subjectName: subjectName || subject, queueType });
+                    onShare({ subject, subjectName, queueType, queueDate });
                   }}
                   title="Поделиться очередью"
                   aria-label="Поделиться очередью"
@@ -417,13 +435,37 @@ export function QueueSlotsModal({
 
             {/* Row with Queue Type subtitle and Occupancy Counter */}
             <div className="flex items-center justify-between gap-3 mt-1.5 w-full min-w-0">
-              <span className="text-sm font-medium text-muted-foreground truncate min-w-0 flex-1 text-left">
-                {queueType || ''}
-              </span>
+              <div className="flex items-center gap-1.5 min-w-0 text-left">
+                <span className="text-sm font-medium text-muted-foreground truncate">
+                  {queueType}
+                </span>
+                {canEditDetails && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                    title="Изменить название и дату очереди"
+                    aria-label="Изменить название и дату очереди"
+                    onClick={() => {
+                      haptic.selection();
+                      setIsDetailsDrawerOpen(true);
+                    }}
+                  >
+                    <PencilSimple size={15} weight="bold" />
+                  </Button>
+                )}
+              </div>
               <span className="text-xs text-muted-foreground font-medium shrink-0 whitespace-nowrap ml-auto">
                 Занято {queueData?.taken_positions ?? currentMeta?.taken_positions ?? 0} из {totalPositions}
               </span>
             </div>
+            {queueDateLabel && (
+              <time dateTime={queueDate ?? undefined} className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <CalendarBlank size={14} />
+                {queueDateLabel}
+              </time>
+            )}
             {/* Auto Delete Badge / Button */}
             {isCreator ? (
               autoDeleteLabel ? (
@@ -627,6 +669,15 @@ export function QueueSlotsModal({
               />
             )}
           </DrawerFooter>
+          {isOpen && canEditDetails && isDetailsDrawerOpen && subject && (
+            <EditQueueDetailsDrawer
+              key={subject}
+              subject={subject}
+              initialTitle={queueType ?? ''}
+              initialDate={queueDate}
+              onClose={() => setIsDetailsDrawerOpen(false)}
+            />
+          )}
         </DrawerContent>
       </Drawer>
 
@@ -647,7 +698,7 @@ export function QueueSlotsModal({
                 Удаление очереди
               </DrawerTitle>
               <DrawerDescription className="text-xs text-muted-foreground font-medium mt-1 text-left">
-                Очередь «{subject}» будет безвозвратно удалена, а все участники
+                Очередь «{[subjectName, queueType].filter(Boolean).join(' • ')}» будет безвозвратно удалена, а все участники
                 потеряют свои места.
               </DrawerDescription>
             </DrawerHeader>

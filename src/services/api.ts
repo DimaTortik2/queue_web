@@ -14,6 +14,8 @@ import {
   QueueStatsResponse,
   QueueHistoryItem,
   QueueCreateDto,
+  QueueMetaInfo,
+  UpdateQueueDetailsDto,
   UserDto,
   KickDto,
   AdvanceQueueDto,
@@ -165,8 +167,14 @@ export const api = {
     ),
 
   createQueue: (data: QueueCreateDto) =>
-    request<{ status: string; data: unknown }>("/queue/create", {
+    request<{ status: string; data: QueueMetaInfo }>("/queue/create", {
       method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateQueueDetails: (subject: string, data: UpdateQueueDetailsDto) =>
+    request<{ status: string }>(`/queue/${encodeURIComponent(subject)}/details`, {
+      method: "PUT",
       body: JSON.stringify(data),
     }),
 
