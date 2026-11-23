@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { QueueDatePicker } from '@/components/queue/QueueDatePicker';
 
 interface QueueDetailsFieldsProps {
   title: string;
@@ -15,7 +16,6 @@ export function QueueDetailsFields({
   title, onTitleChange, date, onDateChange, dateRequired = false,
 }: QueueDetailsFieldsProps) {
   const titleId = useId();
-  const dateId = useId();
 
   return (
     <>
@@ -31,17 +31,7 @@ export function QueueDetailsFields({
           className={inputClassName}
         />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={dateId} className={labelClassName}>Дата очереди</label>
-        <input
-          id={dateId}
-          type="date"
-          value={date}
-          required={dateRequired}
-          onChange={(event) => onDateChange(event.target.value)}
-          className={`${inputClassName} min-h-12 [color-scheme:light] dark:[color-scheme:dark]`}
-        />
-      </div>
+      <QueueDatePicker value={date} onChange={onDateChange} required={dateRequired} />
     </>
   );
 }

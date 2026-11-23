@@ -1,10 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import {
-  CaretLeft,
-  CaretRight,
-  Clock,
-  CalendarBlank,
-} from '@phosphor-icons/react';
+import { Clock, CalendarBlank } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import {
   DrawerNestedRoot,
@@ -13,6 +8,7 @@ import {
   DrawerFooter,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
+import { MonthCalendar } from '@/components/queue/MonthCalendar';
 import { haptic } from '@/lib/telegram';
 import { getDefaultMskDateTime, buildMskIsoString } from '@/lib/dateUtils';
 
@@ -24,23 +20,6 @@ interface GoogleCalendarTimeDrawerProps {
   onConfirm: (date: Date, time: string, isoString: string) => void;
   onClear?: () => void;
 }
-
-const MONTH_NAMES = [
-  'Январь',
-  'Февраль',
-  'Март',
-  'Апрель',
-  'Май',
-  'Июнь',
-  'Июль',
-  'Август',
-  'Сентябрь',
-  'Октябрь',
-  'Ноябрь',
-  'Декабрь',
-];
-
-const WEEK_DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
 export function GoogleCalendarTimeDrawer({
   isOpen,
@@ -85,8 +64,7 @@ export function GoogleCalendarTimeDrawer({
   const [minuteStr, setMinuteStr] = useState<string>(() => String(minute).padStart(2, '0'));
 
   // Calendar month / year view navigation
-  const [viewYear, setViewYear] = useState<number>(() => (initialDate || now).getFullYear());
-  const [viewMonth, setViewMonth] = useState<number>(() => (initialDate || now).getMonth());
+  const [month, setMonth] = useState(initialDate ?? now);
 
   const hourInputRef = useRef<HTMLInputElement>(null);
   const minuteInputRef = useRef<HTMLInputElement>(null);
@@ -99,8 +77,7 @@ export function GoogleCalendarTimeDrawer({
       const baseDate = initialDate ? new Date(initialDate) : def.date;
 
       setSelectedDate(baseDate);
-      setViewYear(baseDate.getFullYear());
-      setViewMonth(baseDate.getMonth());
+      setMonth(baseDate);
 
       let h = parseInt(def.time.split(':')[0], 10);
       let m = parseInt(def.time.split(':')[1], 10);
@@ -119,42 +96,6 @@ export function GoogleCalendarTimeDrawer({
       setMinuteStr(String(m).padStart(2, '0'));
     }
   }, [isOpen, initialDate, initialTime]);
-
-  // Calendar calculations
-  const daysInMonth = useMemo(() => {
-    return new Date(viewYear, viewMonth + 1, 0).getDate();
-  }, [viewYear, viewMonth]);
-
-  const firstDayOffset = useMemo(() => {
-    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
-    return (firstDay + 6) % 7;
-  }, [viewYear, viewMonth]);
-
-  const canGoPrevMonth = useMemo(() => {
-    const curYear = now.getFullYear();
-    const curMonth = now.getMonth();
-    return viewYear > curYear || (viewYear === curYear && viewMonth > curMonth);
-  }, [viewYear, viewMonth, now]);
-
-  const handlePrevMonth = () => {
-    haptic.selection();
-    if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear(viewYear - 1);
-    } else {
-      setViewMonth(viewMonth - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    haptic.selection();
-    if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear(viewYear + 1);
-    } else {
-      setViewMonth(viewMonth + 1);
-    }
-  };
 
   const timeString = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 
@@ -373,88 +314,17 @@ export function GoogleCalendarTimeDrawer({
                 </h3>
               </div>
 
-              {/* Month Navigator */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-foreground">
-                  {MONTH_NAMES[viewMonth]} {viewYear} г.
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    disabled={!canGoPrevMonth}
-                    className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary disabled:opacity-25 disabled:cursor-not-allowed transition-colors text-foreground"
-                    aria-label="Предыдущий месяц"
-                  >
-                    <CaretLeft size={16} weight="bold" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary transition-colors text-foreground"
-                    aria-label="Следующий месяц"
-                  >
-                    <CaretRight size={16} weight="bold" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Weekday headers: П В С Ч П С В */}
-              <div className="grid grid-cols-7 gap-1 text-center">
-                {WEEK_DAYS.map((day, idx) => (
-                  <span
-                    key={idx}
-                    className="text-xs font-semibold text-muted-foreground/80 py-1"
-                  >
-                    {day}
-                  </span>
-                ))}
-              </div>
-
-              {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-y-1.5 gap-x-1 justify-items-center">
-                {Array.from({ length: firstDayOffset }).map((_, i) => (
-                  <div key={`offset-${i}`} className="w-9 h-9" />
-                ))}
-
-                {Array.from({ length: daysInMonth }).map((_, i) => {
-                  const day = i + 1;
-                  const cellDate = new Date(viewYear, viewMonth, day);
-                  const isToday = cellDate.toDateString() === now.toDateString();
-
-                  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                  const isPastDay = cellDate.getTime() < todayStart.getTime();
-
-                  const isSelected =
-                    selectedDate.getDate() === day &&
-                    selectedDate.getMonth() === viewMonth &&
-                    selectedDate.getFullYear() === viewYear;
-
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      disabled={isPastDay}
-                      onClick={() => {
-                        haptic.selection();
-                        setSelectedDate(cellDate);
-                        setTimeout(() => setActiveTab('time'), 180);
-                      }}
-                      className={`w-9 h-9 rounded-full text-xs font-semibold flex items-center justify-center transition-all ${
-                        isSelected
-                          ? 'bg-primary text-primary-foreground font-bold shadow scale-105'
-                          : isPastDay
-                            ? 'opacity-25 cursor-not-allowed text-muted-foreground'
-                            : isToday
-                              ? 'bg-primary/15 text-primary font-bold hover:bg-secondary'
-                              : 'text-foreground hover:bg-secondary'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
-              </div>
+              <MonthCalendar
+                month={month}
+                selectedDate={selectedDate}
+                today={now}
+                minDate={now}
+                onMonthChange={setMonth}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setTimeout(() => setActiveTab('time'), 180);
+                }}
+              />
             </div>
           )}
 
