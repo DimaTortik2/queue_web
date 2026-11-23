@@ -3,7 +3,6 @@ const queueDateFormatter = new Intl.DateTimeFormat('ru-RU', {
   weekday: 'short',
   day: 'numeric',
   month: 'short',
-  year: 'numeric',
 });
 
 export function formatQueueDate(value?: string | null): string | null {

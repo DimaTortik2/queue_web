@@ -19,6 +19,9 @@ import { CreateQueueDrawer } from '@/components/queue/CreateQueueDrawer';
 import { QueueShareDrawer } from '@/components/queue/QueueShareDrawer';
 import { QueueLogo } from '@/components/ui/QueueLogo';
 
+const MY_QUEUES = Symbol('my queues');
+type QueueFilter = string | typeof MY_QUEUES | null;
+
 interface DashboardViewProps {
   queueStartParam: string | null;
   onQueueStartParamHandled: () => void;
@@ -29,11 +32,10 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
   const pinnedSubjects = usePreferencesStore((state) => state.pinnedSubjects);
 
   const [search, setSearch] = useState('');
-  const [showMyQueues, setShowMyQueues] = useState(false);
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<
-    string | null
-  >(null);
+  const [selectedFilter, setSelectedFilter] = useState<QueueFilter>(null);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const showMyQueues = selectedFilter === MY_QUEUES;
+  const selectedSubjectFilter = typeof selectedFilter === 'string' ? selectedFilter : null;
 
   // Modals state
   const [selectedQueueSubject, setSelectedQueueSubject] = useState<
@@ -99,7 +101,7 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
       activeSubjects.length > 0 &&
       !activeSubjects.some((s) => s.name === selectedSubjectFilter)
     ) {
-      setSelectedSubjectFilter(null);
+      setSelectedFilter(null);
     }
   }, [selectedSubjectFilter, activeSubjects]);
 
@@ -139,18 +141,18 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
   }, [filteredQueues, pinnedSubjects, sortOrder]);
 
   const handleSelectFilter = useCallback(
-    (subjectName: string | null) => {
+    (filter: QueueFilter) => {
       haptic.selection();
-      if (selectedSubjectFilter === subjectName) {
+      if (selectedFilter === filter) {
         // Toggle sort order when clicking the already active filter
         setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
       } else {
         // Selecting another filter resets sort to default (newest first)
-        setSelectedSubjectFilter(subjectName);
+        setSelectedFilter(filter);
         setSortOrder('desc');
       }
     },
-    [selectedSubjectFilter]
+    [selectedFilter]
   );
 
   const handleOpenQueue = useCallback((subject: string) => {
@@ -172,9 +174,14 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
   const membershipUnavailable = showMyQueues && isErrorUserQueues && !userQueuesData;
   const isLoadingList = (isLoadingQueues && !queuesData) || (showMyQueues && isLoadingUserQueues);
   const hasNoMemberships = showMyQueues && userQueuesData?.queues.length === 0;
+  const filters: { key: string; label: string; value: QueueFilter }[] = [
+    { key: 'mine', label: 'Мои очереди', value: MY_QUEUES },
+    { key: 'all', label: 'Все', value: null },
+    ...activeSubjects.map(({ id, name }) => ({ key: `subject-${id}`, label: name, value: name })),
+  ];
   const emptyTitle = hasNoMemberships ? 'Вы пока ни в одной очереди' : 'Очереди не найдены';
   const emptyHint = hasNoMemberships
-    ? 'Снимите фильтр, чтобы выбрать очередь и занять место.'
+    ? 'Откройте «Все», чтобы выбрать очередь и занять место.'
     : search.trim() || selectedSubjectFilter
       ? 'Измените поиск или выберите другой предмет.'
       : showMyQueues ? null : 'Создайте очередь с помощью кнопки выше.';
@@ -217,69 +224,30 @@ export function DashboardView({ queueStartParam, onQueueStartParamHandled }: Das
           placeholder="Поиск по предмету или типу сдачи..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-card hover:bg-card/90 focus:ring-2 focus:ring-primary/20 rounded-2xl pl-11 pr-4 py-3.5 text-sm font-medium transition-all placeholder:text-muted-foreground/50 text-foreground border-0 outline-none"
+          className="w-full rounded-2xl border-0 bg-card py-3.5 pl-11 pr-4 text-sm font-medium text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 hover:bg-card/90 focus:bg-accent"
         />
       </div>
 
-      <div className="flex w-full items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={showMyQueues}
-          onClick={() => {
-            haptic.selection();
-            setShowMyQueues((current) => !current);
-          }}
-          className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-all duration-150 tap-press active:scale-95 ${
-            showMyQueues
-              ? 'bg-accent text-accent-foreground ring-1 ring-inset ring-primary/30'
-              : 'bg-secondary text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <UserCircle size={16} weight={showMyQueues ? 'fill' : 'bold'} />
-          Мои очереди
-        </button>
-        {(activeSubjects.length > 0 || selectedSubjectFilter) && (
-          <div className="min-w-0 flex-1 border-l border-border pl-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
-              <button
-                type="button"
-                aria-pressed={selectedSubjectFilter === null}
-                onClick={() => handleSelectFilter(null)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
-                  selectedSubjectFilter === null
-                    ? 'bg-foreground text-background shadow-sm'
-                    : 'bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <span>Все предметы</span>
-                {selectedSubjectFilter === null && sortOrder === 'asc' && (
-                  <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
-                )}
-              </button>
-              {activeSubjects.map((s) => {
-                const isSelected = selectedSubjectFilter === s.name;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => handleSelectFilter(s.name)}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
-                      isSelected
-                        ? 'bg-foreground text-background shadow-sm'
-                        : 'bg-secondary text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    <span>{s.name}</span>
-                    {isSelected && sortOrder === 'asc' && (
-                      <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+      <div role="group" aria-label="Фильтры очередей" className="flex min-w-0 items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
+        {filters.map(({ key, label, value }) => {
+          const isSelected = selectedFilter === value;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => handleSelectFilter(value)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
+                isSelected ? 'bg-foreground text-background' : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <span>{label}</span>
+              {isSelected && sortOrder === 'asc' && (
+                <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Queues List */}

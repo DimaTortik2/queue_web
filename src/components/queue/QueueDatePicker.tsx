@@ -53,7 +53,7 @@ export function QueueDatePicker({ value, onChange, required }: QueueDatePickerPr
             type="button"
             variant="secondary"
             aria-labelledby={`${labelId} ${valueId}`}
-            className="min-h-12 w-full justify-start rounded-2xl px-4 py-3.5 text-sm focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="min-h-12 w-full justify-start rounded-2xl px-4 py-3.5 text-sm focus-visible:bg-accent focus-visible:outline-none"
           >
             <CalendarBlank size={18} weight="bold" className="shrink-0 text-muted-foreground" />
             <span id={valueId} className={cn('truncate', !formattedValue && 'text-muted-foreground')}>

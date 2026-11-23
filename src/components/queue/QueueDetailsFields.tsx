@@ -9,7 +9,7 @@ interface QueueDetailsFieldsProps {
   dateRequired?: boolean;
 }
 
-const inputClassName = 'w-full min-w-0 bg-secondary rounded-2xl px-4 py-3.5 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:ring-2 focus:ring-primary/20 border-0 outline-none';
+const inputClassName = 'w-full min-w-0 rounded-2xl bg-secondary px-4 py-3.5 text-sm font-medium text-foreground outline-none placeholder:text-muted-foreground/50 focus:bg-accent';
 const labelClassName = 'text-xs font-semibold text-muted-foreground uppercase tracking-wider';
 
 export function QueueDetailsFields({

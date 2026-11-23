@@ -276,7 +276,7 @@ export function GoogleCalendarTimeDrawer({
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === 'date'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary text-foreground hover:bg-secondary/80'
                 }`}
               >
@@ -292,7 +292,7 @@ export function GoogleCalendarTimeDrawer({
                 }}
                 className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   activeTab === 'time'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    ? 'bg-primary text-primary-foreground'
                     : 'bg-secondary text-foreground hover:bg-secondary/80'
                 }`}
               >
@@ -358,7 +358,7 @@ export function GoogleCalendarTimeDrawer({
                     onBlur={handleHourBlur}
                     onKeyDown={handleHourKeyDown}
                     onWheel={handleHourWheel}
-                    className="w-24 h-20 rounded-2xl bg-secondary text-foreground text-center text-5xl font-bold outline-none focus:bg-primary/20 focus:text-primary transition-all cursor-pointer select-all shadow-inner"
+                    className="w-24 h-20 rounded-2xl bg-secondary text-foreground text-center text-5xl font-bold outline-none focus:bg-primary/20 focus:text-primary transition-all cursor-pointer select-all"
                   />
                   <button
                     type="button"
@@ -408,7 +408,7 @@ export function GoogleCalendarTimeDrawer({
                     onBlur={handleMinuteBlur}
                     onKeyDown={handleMinuteKeyDown}
                     onWheel={handleMinuteWheel}
-                    className="w-24 h-20 rounded-2xl bg-secondary text-foreground text-center text-5xl font-bold outline-none focus:bg-primary/20 focus:text-primary transition-all cursor-pointer select-all shadow-inner"
+                    className="w-24 h-20 rounded-2xl bg-secondary text-foreground text-center text-5xl font-bold outline-none focus:bg-primary/20 focus:text-primary transition-all cursor-pointer select-all"
                   />
                   <button
                     type="button"
@@ -464,7 +464,7 @@ export function GoogleCalendarTimeDrawer({
             <Button
               type="button"
               onClick={handleConfirm}
-              className="rounded-2xl px-5 h-12 text-sm font-semibold flex-1 shadow-sm border-0"
+              className="rounded-2xl px-5 h-12 text-sm font-semibold flex-1 border-0"
             >
               ОК
             </Button>

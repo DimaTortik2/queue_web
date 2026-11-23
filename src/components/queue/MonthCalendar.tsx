@@ -37,7 +37,7 @@ export function MonthCalendar({ month, selectedDate, today, minDate, onMonthChan
     onMonthChange(date);
   };
 
-  const monthButtonClass = 'flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:opacity-25 disabled:cursor-not-allowed';
+  const monthButtonClass = 'flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none disabled:opacity-25 disabled:cursor-not-allowed';
 
   return (
     <div className="flex flex-col gap-2">
@@ -91,9 +91,9 @@ export function MonthCalendar({ month, selectedDate, today, minDate, onMonthChan
                 onSelect(date);
               }}
               className={cn(
-                'flex aspect-square w-full max-w-11 items-center justify-center rounded-full text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary',
+                'flex aspect-square w-full max-w-11 items-center justify-center rounded-full text-sm font-semibold transition-colors focus-visible:outline-none',
                 disabled && 'cursor-not-allowed opacity-30',
-                isSelected ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground enabled:hover:bg-secondary',
+                isSelected ? 'bg-primary text-primary-foreground focus-visible:bg-primary/70' : 'text-foreground enabled:hover:bg-secondary focus-visible:bg-secondary',
                 isToday && !isSelected && 'bg-primary/15 text-accent-foreground',
               )}
             >

@@ -46,6 +46,8 @@ import { GoogleCalendarTimeDrawer } from '@/components/queue/GoogleCalendarTimeD
 import { QueuePinButton } from '@/components/queue/QueuePinButton';
 import { EditQueueDetailsDrawer } from '@/components/queue/EditQueueDetailsDrawer';
 
+const headerActionClassName = 'h-8 w-8 shrink-0 rounded-xl p-0 text-muted-foreground hover:bg-transparent hover:text-foreground focus-visible:text-foreground';
+
 // ── Memoized Slot Button to avoid re-rendering all 30 on every state change ──
 interface SlotButtonProps {
   pos: number;
@@ -415,11 +417,12 @@ export function QueueSlotsModal({
               </DrawerTitle>
               <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                 {isCreator && <Badge variant="subtle">Создатель</Badge>}
-                {subject && <QueuePinButton subject={subject} className="h-8 w-8 rounded-xl" />}
+                {subject && <QueuePinButton subject={subject} appearance="drawer" className={headerActionClassName} />}
                 <Button
+                  type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-xl shrink-0"
+                  className={headerActionClassName}
                   onClick={() => {
                     if (!subject) return;
                     haptic.selection();
@@ -444,7 +447,7 @@ export function QueueSlotsModal({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                    className={headerActionClassName}
                     title="Изменить название и дату очереди"
                     aria-label="Изменить название и дату очереди"
                     onClick={() => {
@@ -461,8 +464,8 @@ export function QueueSlotsModal({
               </span>
             </div>
             {queueDateLabel && (
-              <time dateTime={queueDate ?? undefined} className="mt-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <CalendarBlank size={14} />
+              <time dateTime={queueDate ?? undefined} className="mt-1 flex w-full items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted-foreground">
+                <CalendarBlank size={14} className="shrink-0" />
                 {queueDateLabel}
               </time>
             )}
