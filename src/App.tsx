@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import {
@@ -19,6 +19,8 @@ import { DashboardView } from "@/views/DashboardView";
 import { RequestsView } from "@/views/RequestsView";
 import { ProfileView } from "@/views/ProfileView";
 import { SwapRespondDrawer } from "@/components/queue/SwapRespondDrawer";
+
+const REQUESTS_START_PARAM = "requests";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,11 +88,20 @@ function NavigationBar() {
 
 function AppContent() {
   useTelegramNavigation();
+  const navigate = useNavigate();
   const { activeSwapProposal, setActiveSwapProposal, setPendingIncomingCount } = useNotificationStore();
   const { user, isLoading, error, initUser } = useUserStore();
   const { disableSwapPopups } = usePreferencesStore();
-  const [queueStartParam, setQueueStartParam] = useState(getTelegramStartParam);
-  const clearQueueStartParam = useCallback(() => setQueueStartParam(null), []);
+  const [startParam, setStartParam] = useState(getTelegramStartParam);
+  const clearStartParam = useCallback(() => setStartParam(null), []);
+  const opensRequests = startParam === REQUESTS_START_PARAM;
+
+  useEffect(() => {
+    if (opensRequests) {
+      navigate("/requests", { replace: true });
+      clearStartParam();
+    }
+  }, [opensRequests, navigate, clearStartParam]);
 
   const { data: incomingSwapsData } = useIncomingSwaps('all', user?.tg_id);
 
@@ -147,8 +158,8 @@ function AppContent() {
           path="/"
           element={
             <DashboardView
-              queueStartParam={queueStartParam}
-              onQueueStartParamHandled={clearQueueStartParam}
+              queueStartParam={opensRequests ? null : startParam}
+              onQueueStartParamHandled={clearStartParam}
             />
           }
         />

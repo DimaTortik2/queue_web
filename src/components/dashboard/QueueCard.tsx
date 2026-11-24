@@ -1,9 +1,8 @@
-import { CalendarBlank, CheckCircle, LockSimple, Trash } from "@phosphor-icons/react";
+import { CalendarBlank, CheckCircle, CrownSimple, LockSimple, Trash } from "@phosphor-icons/react";
 import { QueueMetaInfo } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { QueuePinButton } from "@/components/queue/QueuePinButton";
 import { formatAutoDeleteTime, formatQueueDate } from "@/lib/dateUtils";
-import { cn } from "@/lib/utils";
 
 interface QueueCardProps {
   queue: QueueMetaInfo;
@@ -28,10 +27,7 @@ export function QueueCard({
   return (
     <div
       onClick={onClick}
-      className={cn(
-        "group relative active:scale-[0.975] rounded-2xl p-5 flex flex-col gap-4 transition-all duration-150 cursor-pointer select-none tap-press animate-list-item",
-        isJoined ? "bg-accent hover:bg-accent/75" : "bg-card hover:bg-secondary/60",
-      )}
+      className="group relative flex flex-col gap-4 rounded-2xl bg-card p-5 transition-all duration-150 cursor-pointer select-none tap-press animate-list-item hover:bg-secondary/60 active:scale-[0.975]"
     >
       {/* Top Header */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2">
@@ -50,9 +46,7 @@ export function QueueCard({
 
         <div className="flex items-start gap-1.5 shrink-0">
           {isCreator && (
-            <Badge variant="subtle">
-              Создатель
-            </Badge>
+            <CrownSimple size={18} weight="fill" role="img" alt="Создатель очереди" className="mt-0.5 shrink-0 text-primary" />
           )}
           <div className="flex flex-col items-end gap-1.5">
             {queue.is_paused && (
@@ -96,7 +90,7 @@ export function QueueCard({
             Занято {queue.taken_positions} из {queue.total_positions} мест
           </span>
           {autoDeleteLabel && (
-            <span className="flex items-center gap-1 text-[11px] text-primary font-semibold shrink-0">
+            <span className="flex items-center gap-1 shrink-0">
               <Trash size={13} weight="bold" />
               {autoDeleteLabel}
             </span>

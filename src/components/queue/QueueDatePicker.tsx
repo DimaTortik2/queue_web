@@ -71,7 +71,13 @@ export function QueueDatePicker({ value, onChange, required }: QueueDatePickerPr
         <div className="min-h-0 overflow-y-auto px-6 py-2">
           <MonthCalendar month={month} selectedDate={selectedDate} today={today} onMonthChange={setMonth} onSelect={setSelectedDate} />
         </div>
-        <DrawerFooter className="mb-0 shrink-0 gap-2.5 px-6 pt-3 pb-6">
+        <DrawerFooter
+          className="mb-0 shrink-0 gap-2.5 px-6 pt-3"
+          style={{ paddingBottom: `calc(1.5rem + max(
+            env(safe-area-inset-bottom, 0px),
+            var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px)
+          ))` }}
+        >
           <div className="flex items-center justify-between">
             <Button
               type="button"

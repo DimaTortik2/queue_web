@@ -22,11 +22,11 @@ export function QueuePinButton({ subject, className, appearance = 'card' }: Queu
       size="sm"
       variant="ghost"
       className={cn(
-        'shrink-0',
+        'shrink-0 hover:bg-transparent',
         !isDrawer && 'h-auto rounded-lg p-1',
         !isDrawer && (isPinned
-          ? 'text-amber-500 hover:bg-transparent'
-          : 'text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted'),
+          ? 'text-amber-500'
+          : 'text-muted-foreground/30 [@media(hover:hover)]:hover:text-muted-foreground [@media(hover:hover)]:hover:bg-muted'),
         className,
       )}
       title={label}

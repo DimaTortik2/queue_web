@@ -46,7 +46,7 @@ import { GoogleCalendarTimeDrawer } from '@/components/queue/GoogleCalendarTimeD
 import { QueuePinButton } from '@/components/queue/QueuePinButton';
 import { EditQueueDetailsDrawer } from '@/components/queue/EditQueueDetailsDrawer';
 
-const headerActionClassName = 'h-8 w-8 shrink-0 rounded-xl p-0 text-muted-foreground hover:bg-transparent hover:text-foreground focus-visible:text-foreground';
+const headerActionClassName = 'h-8 w-8 shrink-0 rounded-xl p-0 text-muted-foreground hover:bg-transparent [@media(hover:hover)]:hover:text-foreground focus-visible:text-foreground';
 
 // ── Memoized Slot Button to avoid re-rendering all 30 on every state change ──
 interface SlotButtonProps {

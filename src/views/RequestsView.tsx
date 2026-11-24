@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { ArrowsLeftRight, Check, X, SortAscending } from '@phosphor-icons/react';
 import { useUserStore } from '@/store/userStore';
 import { useNotificationStore } from '@/store/notificationStore';
@@ -50,22 +49,28 @@ export function RequestsView() {
     return [queue.subject_name, queue.queue_type, formatQueueDate(queue.queue_date)].filter(Boolean).join(' • ');
   };
 
-  // "all" by default, or specific selected subject
-  const currentSubject = selectedSubject || 'all';
+  const currentSubject = selectedSubject && queuesBySubject.has(selectedSubject) ? selectedSubject : null;
+
+  useEffect(() => {
+    if (selectedSubject !== currentSubject) {
+      setSelectedSubject(currentSubject);
+      setSortOrder('desc');
+    }
+  }, [selectedSubject, currentSubject]);
 
   const {
     data: incomingData,
     isLoading: isLoadingIncoming,
     isError: isErrorIncoming,
     refetch: refetchIncoming,
-  } = useIncomingSwaps(currentSubject, user?.tg_id);
+  } = useIncomingSwaps(currentSubject ?? 'all', user?.tg_id);
 
   const {
     data: outgoingData,
     isLoading: isLoadingOutgoing,
     isError: isErrorOutgoing,
     refetch: refetchOutgoing,
-  } = useOutgoingSwaps(currentSubject, user?.tg_id);
+  } = useOutgoingSwaps(currentSubject ?? 'all', user?.tg_id);
 
   const acceptMutation = useAcceptSwapMutation();
   const rejectMutation = useRejectSwapMutation();
@@ -99,7 +104,7 @@ export function RequestsView() {
   const handleSelectSubject = useCallback(
     (subject: string | null) => {
       haptic.selection();
-      if (selectedSubject === subject) {
+      if (currentSubject === subject) {
         // Toggle sort order
         setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
       } else {
@@ -107,7 +112,7 @@ export function RequestsView() {
         setSortOrder('desc');
       }
     },
-    [selectedSubject]
+    [currentSubject]
   );
 
   const pendingCount = incomingRequests.filter(
@@ -167,24 +172,24 @@ export function RequestsView() {
   return (
     <div className="flex flex-col gap-6 px-5 pt-6 pb-32 max-w-lg mx-auto w-full select-none native-page-enter">
       {/* Queue selector carousel with "Все" by default, analogous to Dashboard */}
-      {uniqueUserQueues.length > 0 ? (
+      {uniqueUserQueues.length > 0 && (
         <div className="w-full overflow-hidden">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 scroll-smooth snap-x snap-mandatory">
             <button
               onClick={() => handleSelectSubject(null)}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 snap-start transition-all duration-150 tap-press active:scale-95 ${
-                selectedSubject === null
+                currentSubject === null
                   ? 'bg-foreground text-background shadow-sm'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
               }`}
             >
               <span>Все</span>
-              {selectedSubject === null && sortOrder === 'asc' && (
+              {currentSubject === null && sortOrder === 'asc' && (
                 <SortAscending size={14} weight="bold" className="shrink-0 animate-in fade-in zoom-in-75 duration-150" />
               )}
             </button>
             {uniqueUserQueues.map((q) => {
-              const isSelected = selectedSubject === q.subject;
+              const isSelected = currentSubject === q.subject;
               return (
                 <button
                   key={q.subject}
@@ -204,19 +209,6 @@ export function RequestsView() {
             })}
             <div className="shrink-0 w-4" />
           </div>
-        </div>
-      ) : (
-        <div className="bg-card rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-2">
-          <p className="text-xs text-muted-foreground font-medium">
-            Вы пока не записаны ни в одну очередь.
-          </p>
-          <Link
-            to="/"
-            onClick={() => haptic.selection()}
-            className="text-xs text-primary font-semibold hover:underline"
-          >
-            К списку очередей!
-          </Link>
         </div>
       )}
 
