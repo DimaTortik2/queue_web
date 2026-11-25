@@ -43,7 +43,7 @@ export function QueueDatePicker({ value, onChange, required }: QueueDatePickerPr
   }
 
   return (
-    <DrawerNestedRoot open={open} onOpenChange={handleOpenChange} autoFocus>
+    <DrawerNestedRoot open={open} onOpenChange={handleOpenChange} handleOnly repositionInputs={false} autoFocus>
       <div className="flex flex-col gap-1.5">
         <span id={labelId} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Дата очереди
